@@ -45,6 +45,13 @@ body {
   font-family: monospace;
 }
 
+/* 场景描述条 */
+#desc-bar {
+  padding: 6px 16px; font-size: 13px; color: var(--yellow);
+  background: var(--surface); border-bottom: 1px solid var(--overlay);
+  min-height: 30px; line-height: 1.5;
+}
+
 /* 三区布局 */
 .layout {
   display: flex; flex: 1; overflow: hidden;

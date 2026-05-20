@@ -70,6 +70,7 @@ function loadPreset(preset) {
     item.classList.toggle('active', PRESETS[idx] === preset);
   });
 
+  document.getElementById('desc-bar').textContent = preset.description || '';
   runCode();
 }
 
