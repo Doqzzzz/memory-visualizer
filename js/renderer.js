@@ -56,27 +56,32 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     }
   }
 
-  // 先画竖直父子箭头（列表展开）
-  function drawParentChildArrows(box) {
-    if (!exists(box.address)) return;
-    if (box.children) {
-      for (var i = 0; i < box.children.length; i++) {
-        var child = box.children[i];
-        if (exists(child.address)) {
-          self.drawArrow(
-            box.x + box.w / 2, box.y + box.h,
-            child.x + child.w / 2, child.y,
-            '#cba6f7'
-          );
-          // 索引标签
-          var ctx = self.ctx;
-          ctx.fillStyle = '#6c7086';
-          ctx.font = '9px monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText('[' + (child.index != null ? child.index : i) + ']', child.x + child.w / 2, child.y - 5);
-        }
-        drawParentChildArrows(child);
-      }
+  // 先画竖直父子箭头（列表展开）—— 用当前快照的 refs 匹配 baseBoxes 位置
+  function drawChildrenArrows(box, currentAddr) {
+    if (!exists(currentAddr)) return;
+    var obj = objects[currentAddr];
+    if (!obj || !obj.refs || !box.children) return;
+    for (var i = 0; i < obj.refs.length; i++) {
+      if (!exists(obj.refs[i])) continue;
+      var childPos = box.children[i];
+      if (!childPos) continue;
+      self.drawArrow(
+        box.x + box.w / 2, box.y + box.h,
+        childPos.x + childPos.w / 2, childPos.y,
+        '#cba6f7'
+      );
+      var ctx = self.ctx;
+      ctx.fillStyle = '#6c7086';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('[' + i + ']', childPos.x + childPos.w / 2, childPos.y - 5);
+      drawChildrenArrows(childPos, obj.refs[i]);
+    }
+  }
+
+  for (var i = 0; i < baseBoxes.length; i++) {
+    if (exists(baseBoxes[i].address)) {
+      drawChildrenArrows(baseBoxes[i], baseBoxes[i].address);
     }
   }
 
@@ -93,11 +98,11 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   var pcPairs = {};
   for (var i = 0; i < baseBoxes.length; i++) { collectParentChildPairs(baseBoxes[i], pcPairs); }
 
-  // 先画引用箭头（跨盒子，排除父子关系）
+  // 先画引用箭头（跨盒子，排除列表对象）
   function drawRefArrowsForBox(box) {
     if (!exists(box.address)) return;
     var obj = objects[box.address];
-    if (!obj || !obj.refs) return;
+    if (!obj || !obj.refs || obj.type === 'list') return;
     for (var i = 0; i < obj.refs.length; i++) {
       var refAddr = obj.refs[i];
       var target = self.findBox(refAddr, baseBoxes);
@@ -119,20 +124,26 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     drawRefArrowsForBox(baseBoxes[i]);
   }
 
-  // 再画所有盒子
-  function drawAllBoxes(box) {
-    var filled = exists(box.address);
-    var obj = filled ? objects[box.address] : null;
-    var names = filled ? getVarNames(box.address) : [];
-    self.drawBox(box.x, box.y, box.w, box.h, box.address, box.type, filled, names, obj, diffSet);
-    if (box.children) {
-      for (var i = 0; i < box.children.length; i++) {
-        drawAllBoxes(box.children[i]);
+  // 再画所有盒子 —— 用当前快照的 refs 匹配 baseBoxes 位置
+  function drawBoxTree(posBox, currentAddr) {
+    var filled = exists(currentAddr);
+    var obj = filled ? objects[currentAddr] : null;
+    var names = filled ? getVarNames(currentAddr) : [];
+    self.drawBox(posBox.x, posBox.y, posBox.w, posBox.h, currentAddr, obj ? obj.type : posBox.type, filled, names, obj, diffSet);
+
+    if (filled && obj && obj.refs && posBox.children) {
+      for (var i = 0; i < obj.refs.length; i++) {
+        var childPos = posBox.children[i];
+        if (childPos && exists(obj.refs[i])) {
+          drawBoxTree(childPos, obj.refs[i]);
+        }
       }
     }
   }
   for (var i = 0; i < baseBoxes.length; i++) {
-    drawAllBoxes(baseBoxes[i]);
+    if (baseBoxes[i].address) {
+      drawBoxTree(baseBoxes[i], baseBoxes[i].address);
+    }
   }
 };
 
