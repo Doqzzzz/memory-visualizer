@@ -1,7 +1,7 @@
 var stateManager = null;
 var renderer = null;
 
-var langSelect = document.getElementById('lang-select');
+var currentLanguage = 'python';
 var runBtn = document.getElementById('run-btn');
 var resetBtn = document.getElementById('reset-btn');
 var codeEditor = document.getElementById('code-editor');
@@ -58,7 +58,7 @@ function renderPresetList() {
 
 function loadPreset(preset) {
   codeEditor.value = preset.code;
-  langSelect.value = preset.language;
+  currentLanguage = preset.language;
 
   var items = presetList.querySelectorAll('li');
   items.forEach(function(item) {
@@ -71,7 +71,8 @@ function loadPreset(preset) {
 
 function runCode() {
   var code = codeEditor.value.trim();
-  var language = langSelect.value;
+  // 自动检测语言：含 int/int */& 判为 C
+  var language = /\bint\b|&/.test(code) ? 'c' : currentLanguage;
 
   if (!code) { showError('请输入代码'); return; }
 
