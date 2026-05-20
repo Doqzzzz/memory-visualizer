@@ -46,7 +46,11 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   }
 
   // ---- 画所有引用箭头 ----
-  // 第一遍：收集嵌套列表的标签前缀
+  var arrowColors = ['#cba6f7', '#f9e2af', '#89b4fa', '#a6e3a1'];
+  var colorIdx = 0;
+  var boxColors = {};
+
+  // 第一遍：收集嵌套列表的标签前缀 + 分配颜色
   var nestedLabels = {};
   for (var i = 0; i < baseBoxes.length; i++) {
     var box = baseBoxes[i];
@@ -60,6 +64,9 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
       var ro = objects[ra];
       if (ro && ro.type === 'list') nestedLabels[ra] = prefix + '[' + j + ']';
     }
+    if (!boxColors[box.address]) {
+      boxColors[box.address] = arrowColors[colorIdx++ % arrowColors.length];
+    }
   }
 
   // 第二遍：画箭头
@@ -71,6 +78,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
 
     var parentNames = getVarNames(box.address);
     var prefix = nestedLabels[box.address] || (parentNames && parentNames.length > 0 ? parentNames[0] : '');
+    var color = boxColors[box.address] || '#cba6f7';
 
     for (var j = 0; j < obj.refs.length; j++) {
       var refAddr = obj.refs[j];
@@ -84,7 +92,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
       var tx = refPos.x + refPos.w / 2;
       var ty = refPos.y;
       var bend = (sx < tx) ? 20 + j * 8 : -(20 + j * 8);
-      self.drawRefArrow(sx, sy, tx, ty, '#cba6f7', idxLabel, bend);
+      self.drawRefArrow(sx, sy, tx, ty, color, idxLabel, bend);
     }
   }
 
