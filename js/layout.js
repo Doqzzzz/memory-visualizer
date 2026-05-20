@@ -63,13 +63,9 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
   }
   var refAddrList = Object.keys(allRefAddrs);
 
-  // ---- 计算顶层盒子需要的宽度 ----
+  // ---- 计算顶层盒子需要的宽度（扁平模式，子元素独立放置） ----
   function treeWidth(addr) {
-    var obj = objects[addr];
-    var children = (allChildAddrs && allChildAddrs[addr]) ? Object.keys(allChildAddrs[addr]) : (obj && obj.refs ? obj.refs : []);
-    if (children.length === 0) return BOX_W;
-    var total = children.length * (CELL_W + CELL_GAP) - CELL_GAP;
-    return Math.max(BOX_W, total);
+    return BOX_W;
   }
 
   var treeWidths = [];
