@@ -126,26 +126,34 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   }
 
   // 再画所有盒子 —— 子元素是否实心取决于是否在父对象当前 refs 中
-  function drawBoxTree(posBox, currentAddr, parentRefSet) {
+  function drawBoxTree(posBox, currentAddr, parentRefSet, boxLabel) {
     var existsInObjs = exists(currentAddr);
     var filled = existsInObjs;
-    // 如果有父 refs 集合，子元素必须在父 refs 中才算实心
     if (parentRefSet && existsInObjs) {
       filled = parentRefSet.hasOwnProperty(currentAddr);
     }
     var obj = filled ? objects[currentAddr] : null;
-    var names = filled ? getVarNames(currentAddr) : [];
+    var names = [];
+    if (filled) {
+      if (boxLabel) { names.push(boxLabel); }
+      else {
+        var vns = getVarNames(currentAddr);
+        for (var n = 0; n < vns.length; n++) names.push(vns[n]);
+      }
+    }
     self.drawBox(posBox.x, posBox.y, posBox.w, posBox.h, currentAddr, obj ? obj.type : posBox.type, filled, names, obj, diffSet);
 
-    // 为本对象的子元素准备 refs 集合
+    // 为本对象的子元素准备 refs 集合 + 标签前缀
     var myRefSet = null;
+    var labelPrefix = (names && names.length > 0) ? names[0] : '';
     if (filled && obj && obj.refs && posBox.children && posBox.children.length > 0) {
       myRefSet = {};
       for (var r = 0; r < obj.refs.length; r++) { myRefSet[obj.refs[r]] = true; }
     }
     if (posBox.children && posBox.children.length > 0) {
       for (var i = 0; i < posBox.children.length; i++) {
-        drawBoxTree(posBox.children[i], posBox.children[i].address, myRefSet);
+        var childLabel = labelPrefix ? labelPrefix + '[' + posBox.children[i].index + ']' : '[' + posBox.children[i].index + ']';
+        drawBoxTree(posBox.children[i], posBox.children[i].address, myRefSet, childLabel);
       }
     }
   }
@@ -169,10 +177,10 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#6c7086';
-    ctx.font = '9px monospace';
+    ctx.fillStyle = '#bac2de';
+    ctx.font = '10px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(address, x + 4, y + 12);
+    ctx.fillText(address, x + 6, y + 14);
 
     if (varNames && varNames.length > 0) {
       ctx.fillStyle = '#89b4fa';
