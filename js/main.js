@@ -93,15 +93,15 @@ function showEditView() {
 }
 
 function highlightLine(stepIndex) {
-  // step 0 → 无高亮
-  var lineIdx = stepIndex - 1;
+  // stepIndex 是 0-based: 0 = 初始状态(不高亮), 1 = 第一行代码
   var allLines = codeDisplay.querySelectorAll('.line');
   for (var i = 0; i < allLines.length; i++) {
     allLines[i].classList.remove('current');
   }
-  if (lineIdx >= 0 && lineIdx < allLines.length) {
-    allLines[lineIdx].classList.add('current');
-    allLines[lineIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  // 第 0 步不高亮任何行
+  if (stepIndex > 0 && stepIndex - 1 < allLines.length) {
+    allLines[stepIndex - 1].classList.add('current');
+    allLines[stepIndex - 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 }
 
@@ -120,13 +120,9 @@ function runCode() {
     stateManager = new StateManager(events);
     if (stateManager.totalSteps > 0) {
       showCodeView();
+      // 用最终快照计算整体布局
       renderer.resize();
-      // 用最后一步的快照预计算所有盒子位置
-      var lastStep = stateManager.totalSteps - 1;
-      stateManager.goToStep(lastStep);
-      var finalSnap = stateManager.currentSnapshot;
-      baseBoxes = computeLayout(finalSnap, renderer.w, renderer.h);
-      // 回到第 0 步展示空盒子
+      baseBoxes = computeLayout(stateManager.finalSnapshot, renderer.w, renderer.h);
       goToStep(0);
     } else {
       baseBoxes = null;
@@ -161,8 +157,12 @@ function goToStep(n) {
   if (!stateManager || stateManager.totalSteps === 0) return;
   stateManager.goToStep(n);
   renderer.resize();
+  var snapshot = stateManager.currentSnapshot;
+  if (!baseBoxes) {
+    baseBoxes = computeLayout(snapshot, renderer.w, renderer.h);
+  }
   var diff = stateManager.getDiff();
-  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
+  renderer.render(baseBoxes, snapshot, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
@@ -188,11 +188,11 @@ function nextStep() {
 }
 
 function updateStepUI() {
-  var totalCodeLines = stateManager ? stateManager.totalSteps - 1 : 0;
+  var total = stateManager ? stateManager.totalSteps - 1 : 0; // totalSteps 含第 0 步
   var current = stateManager ? stateManager.currentStep : 0;
 
-  stepIndicator.textContent = '步骤 ' + current + '/' + totalCodeLines;
-  stepSlider.max = stateManager ? stateManager.totalSteps - 1 : 0;
+  stepIndicator.textContent = '步骤 ' + current + '/' + total;
+  stepSlider.max = total;
   stepSlider.value = current;
 
   prevBtn.disabled = !stateManager || stateManager.currentStep === 0;
