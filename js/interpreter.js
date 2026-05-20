@@ -188,7 +188,8 @@ function interpretC(code) {
     if (m) {
       var ptrAddr = variables[m[1]];
       if (!ptrAddr) throw new Error('未定义的指针: ' + m[1]);
-      objects[ptrAddr.value].value = parseInt(m[2]);
+      var ptr = objects[ptrAddr];
+      objects[ptr.value].value = parseInt(m[2]);
       emit('modify', m[1], ptrAddr, step);
       continue;
     }
