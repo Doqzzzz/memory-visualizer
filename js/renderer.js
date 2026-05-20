@@ -88,35 +88,21 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     }
   }
 
-  // 收集子元素地址（有 ref 指向它的才算子元素）
-  var childAddrSet = {};
-  for (var i = 0; i < baseBoxes.length; i++) {
-    var b = baseBoxes[i];
-    if (!exists(b.address)) continue;
-    var o = objects[b.address];
-    if (o && o.refs) {
-      for (var j = 0; j < o.refs.length; j++) {
-        childAddrSet[o.refs[j]] = true;
-      }
-    }
-  }
-
   // ---- 画所有盒子 ----
   for (var i = 0; i < baseBoxes.length; i++) {
     var box = baseBoxes[i];
-    var isChild = childAddrSet.hasOwnProperty(box.address);
     var filled = exists(box.address);
     var obj = filled ? objects[box.address] : null;
     var names = filled ? getVarNames(box.address) : [];
-    self.drawBox(box.x, box.y, box.w, box.h, box.address, obj ? obj.type : box.type, filled, names, obj, isChild);
+    self.drawBox(box.x, box.y, box.w, box.h, box.address, obj ? obj.type : box.type, filled, names, obj);
   }
 };
 
-Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varNames, obj, isChild) {
+Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varNames, obj) {
   var ctx = this.ctx;
 
   if (filled) {
-    ctx.strokeStyle = isChild ? '#cba6f7' : '#f9e2af';
+    ctx.strokeStyle = '#f9e2af';
     ctx.lineWidth = 1.5;
     ctx.fillStyle = '#313244';
     this.roundRect(x, y, w, h, 6);
@@ -152,14 +138,9 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     ctx.textAlign = 'right';
     ctx.fillText(obj ? obj.type : type, x + w - 4, y + h - 6);
   } else {
-    ctx.setLineDash([3, 5]);
-    ctx.strokeStyle = 'rgba(69, 71, 90, 0.3)';
-    ctx.lineWidth = 0.5;
-    ctx.fillStyle = 'rgba(49, 50, 68, 0.2)';
+    ctx.fillStyle = 'rgba(49, 50, 68, 0.15)';
     this.roundRect(x, y, w, h, 6);
     ctx.fill();
-    ctx.stroke();
-    ctx.setLineDash([]);
 
     ctx.fillStyle = '#bac2de';
     ctx.font = '10px monospace';
