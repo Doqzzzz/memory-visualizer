@@ -208,15 +208,14 @@ function interpretC(code) {
       continue;
     }
 
-    // b = 2 或 b = a（普通赋值，无类型声明）
+    // b = 2 或 b = a（普通赋值，无类型声明）— C 是原地修改，不换地址
     m = line.match(/^(\w+)\s*=\s*(.+)$/);
     if (m) {
       var existingAddr = variables[m[1]];
       if (!existingAddr) throw new Error('未定义的变量: ' + m[1]);
       var val = resolveValue(m[2]);
-      var newObj = allocObject('int', val.value);
-      variables[m[1]] = newObj.address;
-      emit('bind', m[1], newObj.address, step);
+      objects[existingAddr].value = val.value;
+      emit('modify', m[1], existingAddr, step);
       continue;
     }
   }
