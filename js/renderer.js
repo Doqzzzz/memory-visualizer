@@ -37,7 +37,6 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
 
   function exists(addr) { return objects && !!objects[addr]; }
 
-  // 找出哪些变量名绑定到哪个地址
   function getVarNames(addr) {
     var names = [];
     for (var v in variables) {
@@ -46,115 +45,47 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     return names;
   }
 
-  // 递归收集子盒子中有实际数据的地址——仅当父盒子存在时画子盒子
-  function collectExistingAddrs(box, list) {
-    if (exists(box.address)) list.push(box.address);
-    if (box.children) {
-      for (var i = 0; i < box.children.length; i++) {
-        collectExistingAddrs(box.children[i], list);
-      }
-    }
-  }
-
-  // 先画竖直父子箭头（列表展开）—— 当前快照 refs 中有此地址的才画箭头
-  function drawChildrenArrows(box, currentAddr) {
-    if (!exists(currentAddr)) return;
-    var obj = objects[currentAddr];
-    if (!obj || !obj.refs || !box.children) return;
-    // 建当前 refs 地址查找表
-    var refSet = {};
-    for (var r = 0; r < obj.refs.length; r++) { refSet[obj.refs[r]] = r; }
-    for (var i = 0; i < box.children.length; i++) {
-      var childPos = box.children[i];
-      if (!exists(childPos.address) || !refSet.hasOwnProperty(childPos.address)) continue;
-      self.drawArrow(
-        box.x + box.w / 2, box.y + box.h,
-        childPos.x + childPos.w / 2, childPos.y,
-        '#cba6f7'
-      );
-      drawChildrenArrows(childPos, childPos.address);
-    }
-  }
-
+  // ---- 先画所有引用箭头 ----
   for (var i = 0; i < baseBoxes.length; i++) {
-    if (exists(baseBoxes[i].address)) {
-      drawChildrenArrows(baseBoxes[i], baseBoxes[i].address);
-    }
-  }
-
-  // 收集所有已经是父子关系的地址对（避免双重箭头）
-  function collectParentChildPairs(box, set) {
-    if (box.children) {
-      for (var i = 0; i < box.children.length; i++) {
-        set[box.address + '->' + box.children[i].address] = true;
-        set[box.children[i].address + '->' + box.address] = true;
-        collectParentChildPairs(box.children[i], set);
-      }
-    }
-  }
-  var pcPairs = {};
-  for (var i = 0; i < baseBoxes.length; i++) { collectParentChildPairs(baseBoxes[i], pcPairs); }
-
-  // 先画引用箭头（跨盒子，排除列表对象）
-  function drawRefArrowsForBox(box) {
-    if (!exists(box.address)) return;
+    var box = baseBoxes[i];
+    if (!exists(box.address)) continue;
     var obj = objects[box.address];
-    if (!obj || !obj.refs || obj.type === 'list') return;
-    for (var i = 0; i < obj.refs.length; i++) {
-      var refAddr = obj.refs[i];
-      var target = self.findBox(refAddr, baseBoxes);
-      if (target && exists(target.address) && target.address !== box.address) {
-        var key = box.address + '->' + target.address;
-        if (!pcPairs[key]) {
-          self.drawReferArrow(box, target, '#cba6f7');
-        }
+    if (!obj || !obj.refs) continue;
+    for (var r = 0; r < obj.refs.length; r++) {
+      var target = self.findBox(obj.refs[r], baseBoxes);
+      if (target && exists(target.address)) {
+        self.drawReferArrow(box, target, '#cba6f7');
       }
     }
-    if (box.children) {
-      for (var i = 0; i < box.children.length; i++) { drawRefArrowsForBox(box.children[i]); }
-    }
   }
 
-  // 画跨盒子引用箭头
+  // ---- 再画所有盒子（扁平，无嵌套） ----
   for (var i = 0; i < baseBoxes.length; i++) {
-    drawRefArrowsForBox(baseBoxes[i]);
-  }
-
-  // 再画所有盒子 —— 子元素是否实心取决于是否在父对象当前 refs 中
-  function drawBoxTree(posBox, currentAddr, parentRefSet, indexInParent, parentVarName) {
-    var existsInObjs = exists(currentAddr);
-    var filled = existsInObjs;
-    if (parentRefSet && existsInObjs) {
-      filled = parentRefSet.hasOwnProperty(currentAddr);
-    }
-    var obj = filled ? objects[currentAddr] : null;
-    var names = filled ? getVarNames(currentAddr) : [];
-    // 子盒子的下标标签
+    var box = baseBoxes[i];
+    var filled = exists(box.address);
+    var obj = filled ? objects[box.address] : null;
+    var names = filled ? getVarNames(box.address) : [];
+    // 下标标签（被引用盒子，找谁引用了它）
     var subLabel = '';
-    if (indexInParent != null && parentVarName) {
-      subLabel = parentVarName + '[' + indexInParent + ']';
-    }
-    self.drawBox(posBox.x, posBox.y, posBox.w, posBox.h, currentAddr, obj ? obj.type : posBox.type, filled, names, obj, diffSet, subLabel);
-
-    // 收集当前 refs 地址→索引映射
-    var refIndexMap = null;
-    if (filled && obj && obj.refs && posBox.children && posBox.children.length > 0) {
-      refIndexMap = {};
-      for (var r = 0; r < obj.refs.length; r++) { refIndexMap[obj.refs[r]] = r; }
-    }
-    var childPrefix = subLabel || ((names && names.length > 0) ? names[0] : '');
-    if (posBox.children && posBox.children.length > 0) {
-      for (var i = 0; i < posBox.children.length; i++) {
-        var childAddr = posBox.children[i].address;
-        var idx = (refIndexMap && refIndexMap.hasOwnProperty(childAddr)) ? refIndexMap[childAddr] : null;
-        drawBoxTree(posBox.children[i], childAddr, refIndexMap, idx, childPrefix);
+    if (filled && box.isChild && !names.length) {
+      // 找引用此地址的父列表
+      for (var j = 0; j < baseBoxes.length; j++) {
+        var parent = baseBoxes[j];
+        if (!exists(parent.address)) continue;
+        var pobj = objects[parent.address];
+        if (!pobj || !pobj.refs) continue;
+        for (var ri = 0; ri < pobj.refs.length; ri++) {
+          if (pobj.refs[ri] === box.address) {
+            var pnames = getVarNames(parent.address);
+            var prefix = (pnames && pnames.length > 0) ? pnames[0] : parent.type;
+            subLabel = prefix + '[' + ri + ']';
+            break;
+          }
+        }
+        if (subLabel) break;
       }
     }
-  }
-  for (var i = 0; i < baseBoxes.length; i++) {
-    if (baseBoxes[i].address) {
-      drawBoxTree(baseBoxes[i], baseBoxes[i].address);
-    }
+    self.drawBox(box.x, box.y, box.w, box.h, box.address, obj ? obj.type : box.type, filled, names, obj, diffSet, subLabel);
   }
 };
 
