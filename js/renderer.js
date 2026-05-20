@@ -83,7 +83,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
       var sy = box.y + box.h;
       var tx = refPos.x + refPos.w / 2;
       var ty = refPos.y;
-      var bend = (sx < tx) ? 60 + j * 16 : -(60 + j * 16);
+      var bend = (sx < tx) ? 20 + j * 8 : -(20 + j * 8);
       self.drawRefArrow(sx, sy, tx, ty, '#cba6f7', idxLabel, bend);
     }
   }
