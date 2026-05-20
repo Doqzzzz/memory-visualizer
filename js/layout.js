@@ -5,19 +5,19 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
   var variables = snapshot.variables;
   var boxes = [];
 
-  // 尺寸根据画布大小自适应
   var BOX_W = Math.max(130, Math.min(160, canvasWidth / 6));
   var BOX_H = Math.max(62, Math.min(72, canvasHeight / 5));
   var GAP_X = Math.max(60, BOX_W * 0.5);
-  var GAP_Y = Math.max(90, BOX_H * 1.5);
+  var GAP_Y = Math.max(100, BOX_H * 1.6);
 
   var CELL_W = Math.max(80, Math.min(100, canvasWidth / 10));
   var CELL_H = 44;
-  var CELL_GAP = 20;
-  var CELL_Y_GAP = Math.max(50, CELL_H * 1.3);
+  var CELL_GAP = 24;
+  var CELL_Y_GAP = 56;
 
   var PADDING = 40;
 
+  // ---- 收集顶层地址 ----
   var varNames = Object.keys(variables);
   var seen = {};
   var topAddrList = [];
@@ -25,7 +25,8 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
     var addr = variables[varNames[i]];
     if (!seen[addr]) { seen[addr] = true; topAddrList.push(addr); }
   }
-  // 收集所有列表子元素地址（这些已作为 children 展示，不做顶层盒子）
+
+  // 收集列表子元素标记
   var childAddrs = {};
   function markChildren(addr, visited) {
     if (visited[addr]) return;
@@ -43,47 +44,110 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
     if (objects.hasOwnProperty(addr)) markChildren(addr, markVisit);
   }
 
-  // 加入曾在任意步骤绑定过变量、但不在最终 variables 中的中间对象（如 C 临时值）
   if (allVarAddrs) {
     for (var addr in allVarAddrs) {
-      if (!allVarAddrs.hasOwnProperty(addr)) continue;
-      if (!seen[addr] && !childAddrs[addr]) { seen[addr] = true; topAddrList.push(addr); }
+      if (allVarAddrs.hasOwnProperty(addr) && !seen[addr] && !childAddrs[addr]) {
+        seen[addr] = true; topAddrList.push(addr);
+      }
     }
   }
 
-  // 计算总布局宽度（所有顶层盒子 + 间距），再居中偏移
-  var totalWidth = topAddrList.length * (BOX_W + GAP_X) - GAP_X;
-  var startX = Math.max(PADDING, (canvasWidth - totalWidth) / 2);
+  // ---- 辅助函数：获取某地址的子元素列表（全部历史） ----
+  function getActualChildren(addr, obj) {
+    if (allChildAddrs && allChildAddrs[addr]) return Object.keys(allChildAddrs[addr]);
+    return (obj && obj.refs) ? obj.refs : [];
+  }
 
-  // 收集整棵对象树需要的高度
-  function calcTreeHeight(addr, visited) {
+  // ---- 计算子元素实际所需宽度（含孙子） ----
+  function childSlotWidth(childAddr) {
+    var gc = getActualChildren(childAddr, objects[childAddr]);
+    if (gc.length === 0) return CELL_W;
+    var total = gc.length * (CELL_W + CELL_GAP) - CELL_GAP;
+    return Math.max(CELL_W, total);
+  }
+
+  // ---- 计算整棵树需要的宽度 ----
+  function treeWidth(addr) {
+    var obj = objects[addr];
+    var children = getActualChildren(addr, obj);
+    if (children.length === 0) return BOX_W;
+    var total = 0;
+    for (var i = 0; i < children.length; i++) {
+      total += childSlotWidth(children[i]);
+      if (i > 0) total += CELL_GAP;
+    }
+    return Math.max(BOX_W, total);
+  }
+
+  // ---- 计算整棵树需要的高度 ----
+  function treeHeight(addr, visited) {
+    if (!visited) visited = {};
     if (visited[addr]) return BOX_H;
     visited[addr] = true;
     var obj = objects[addr];
-    if (!obj || !obj.refs) return BOX_H;
+    var children = getActualChildren(addr, obj);
+    if (children.length === 0) return BOX_H;
     var maxChildH = 0;
-    for (var i = 0; i < obj.refs.length; i++) {
-      var ch = calcTreeHeight(obj.refs[i], visited);
-      if (ch > maxChildH) maxChildH = ch;
+    for (var i = 0; i < children.length; i++) {
+      var gc = getActualChildren(children[i], objects[children[i]]);
+      if (gc.length > 0) {
+        var h = CELL_H + CELL_Y_GAP + CELL_H;
+        if (h > maxChildH) maxChildH = h;
+      } else {
+        if (CELL_H > maxChildH) maxChildH = CELL_H;
+      }
     }
-    return BOX_H + GAP_Y + CELL_H + (maxChildH > BOX_H ? maxChildH - BOX_H : 0);
+    return BOX_H + GAP_Y + maxChildH;
   }
 
-  var treeVisit = {};
-  var maxTreeH = BOX_H;
+  // ---- 放置顶层盒子 ----
+  // 收集每棵树的宽度，按行排列
+  var treeWidths = [];
   for (var i = 0; i < topAddrList.length; i++) {
-    var th = calcTreeHeight(topAddrList[i], treeVisit);
-    if (th > maxTreeH) maxTreeH = th;
+    treeWidths.push(treeWidth(topAddrList[i]));
   }
 
-  var x = startX;
-  var y = Math.max(PADDING, (canvasHeight - maxTreeH) / 2);
-  if (y < PADDING) y = PADDING;
+  var rowY = PADDING;
+  var row = [];
+  var rowW = 0;
+
+  function flushRow() {
+    var startX = Math.max(PADDING, (canvasWidth - rowW) / 2);
+    var maxH = 0;
+    for (var i = 0; i < row.length; i++) {
+      maxH = Math.max(maxH, treeHeight(row[i].addr));
+    }
+    var x = startX;
+    for (var i = 0; i < row.length; i++) {
+      row[i].baseX = x;
+      row[i].baseY = rowY;
+      x += row[i].tw + GAP_X;
+    }
+    rowY += maxH + GAP_Y;
+    row = [];
+    rowW = 0;
+  }
 
   for (var i = 0; i < topAddrList.length; i++) {
-    var addr = topAddrList[i];
+    var tw = treeWidths[i];
+    if (i > 0 && rowW + tw + GAP_X > canvasWidth - PADDING * 2) {
+      flushRow();
+    }
+    row.push({ addr: topAddrList[i], tw: tw });
+    rowW += tw + (row.length > 1 ? GAP_X : 0);
+  }
+  flushRow();
+
+  // ---- 构建盒子树 ----
+  var addrToPos = {}; // addr -> { baseX, baseY }
+
+  for (var i = 0; i < topAddrList.length; i++) {
+    buildBoxTree(topAddrList[i], addrToPos[topAddrList[i]].baseX, addrToPos[topAddrList[i]].baseY, boxes);
+  }
+
+  function buildBoxTree(addr, x, y, out) {
     var obj = objects[addr];
-    if (!obj) continue;
+    if (!obj) return;
 
     var attachedVars = [];
     for (var j = 0; j < varNames.length; j++) {
@@ -91,60 +155,106 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
     }
 
     var children = [];
-    var childStartX = x;
-    var childY = y + BOX_H + GAP_Y;
+    var childList = getActualChildren(addr, obj);
 
-    var actualChildren = (allChildAddrs && allChildAddrs[addr]) ? Object.keys(allChildAddrs[addr]) : (obj.refs || []);
-
-    if (obj.type === 'list' && actualChildren.length > 0) {
+    if (obj.type === 'list' && childList.length > 0) {
       // 计算子元素总宽度
-      var totalChildW = actualChildren.length * (CELL_W + CELL_GAP) - CELL_GAP;
-      var cx = x + (BOX_W - totalChildW) / 2;
-      if (cx < PADDING) cx = PADDING;
+      var slotWidths = [];
+      var totalW = 0;
+      for (var k = 0; k < childList.length; k++) {
+        var sw = childSlotWidth(childList[k]);
+        slotWidths.push(sw);
+        totalW += sw + (k > 0 ? CELL_GAP : 0);
+      }
 
-      for (var k = 0; k < actualChildren.length; k++) {
-        var childAddr = actualChildren[k];
-        var child = objects[childAddr] || (allChildAddrs && allChildAddrs[addr] ? { type: '?', value: null, refs: null, address: childAddr } : null);
-        if (!child) continue;
+      var cx = x + (treeWidth(addr) - totalW) / 2;
+      if (cx < PADDING) cx = PADDING;
+      var cy = y + BOX_H + GAP_Y;
+
+      for (var k = 0; k < childList.length; k++) {
+        var childAddr = childList[k];
+        var child = objects[childAddr] || { type: '?', value: null, refs: null, address: childAddr };
+        var slotW = slotWidths[k];
 
         var childBox = {
-          x: cx, y: childY, w: CELL_W, h: CELL_H,
+          x: cx, y: cy, w: CELL_W, h: CELL_H,
           address: childAddr, type: child.type || '?', value: child.value,
           refs: child.refs, varNames: [], index: k, children: []
         };
 
-        // 嵌套列表 —— 同样使用全部历史子元素
-        var nestedChildren = (allChildAddrs && allChildAddrs[childAddr]) ? Object.keys(allChildAddrs[childAddr]) : (child.refs || []);
-        if ((child.type === 'list' || nestedChildren.length > 0) && nestedChildren.length > 0) {
-          var grandTotalW = nestedChildren.length * (CELL_W + CELL_GAP) - CELL_GAP;
-          var gx = cx + (CELL_W - grandTotalW) / 2;
-          if (gx < PADDING) gx = PADDING;
-          var gy = childY + CELL_H + CELL_Y_GAP;
+        // 孙子元素
+        var gcList = getActualChildren(childAddr, child);
+        if (gcList.length > 0) {
+          var gcTotalW = gcList.length * (CELL_W + CELL_GAP) - CELL_GAP;
+          var gcx = cx + (slotW - gcTotalW) / 2;
+          if (gcx < PADDING) gcx = PADDING;
+          var gcy = cy + CELL_H + CELL_Y_GAP;
 
-          for (var m = 0; m < nestedChildren.length; m++) {
-            var gcAddr = nestedChildren[m];
+          for (var m = 0; m < gcList.length; m++) {
+            var gcAddr = gcList[m];
             var gc = objects[gcAddr] || { type: '?', value: null, refs: null, address: gcAddr };
             childBox.children.push({
-              x: gx, y: gy, w: CELL_W, h: CELL_H,
+              x: gcx, y: gcy, w: CELL_W, h: CELL_H,
               address: gcAddr, type: gc.type || '?', value: gc.value,
               refs: null, varNames: [], index: m, children: []
             });
-            gx += CELL_W + CELL_GAP;
+            gcx += CELL_W + CELL_GAP;
           }
         }
 
         children.push(childBox);
-        cx += CELL_W + CELL_GAP;
+        cx += slotW + CELL_GAP;
       }
     }
 
-    boxes.push({
+    out.push({
       x: x, y: y, w: BOX_W, h: BOX_H,
       address: addr, type: obj.type, value: obj.value,
       refs: obj.refs, varNames: attachedVars, children: children
     });
+  }
 
-    x += BOX_W + GAP_X;
+  // ---- 填充 addrToPos（给 flushRow 使用） ----
+  function preAssign() {
+    // 重新执行 row 放置逻辑来填充 addrToPos
+    // （因为 flushRow 使用了 row[i].addr 和 row[i].baseX/baseY）
+  }
+
+  // 重新执行行放置
+  rowY = PADDING;
+  row = [];
+  rowW = 0;
+
+  function flushRow2() {
+    var startX = Math.max(PADDING, (canvasWidth - rowW) / 2);
+    var maxH = 0;
+    for (var i = 0; i < row.length; i++) {
+      maxH = Math.max(maxH, treeHeight(row[i].addr));
+    }
+    var x = startX;
+    for (var i = 0; i < row.length; i++) {
+      addrToPos[row[i].addr] = { baseX: x, baseY: rowY };
+      x += row[i].tw + GAP_X;
+    }
+    rowY += maxH + GAP_Y;
+    row = [];
+    rowW = 0;
+  }
+
+  for (var i = 0; i < topAddrList.length; i++) {
+    var tw = treeWidths[i];
+    if (i > 0 && rowW + tw + GAP_X > canvasWidth - PADDING * 2) {
+      flushRow2();
+    }
+    row.push({ addr: topAddrList[i], tw: tw });
+    rowW += tw + (row.length > 1 ? GAP_X : 0);
+  }
+  flushRow2();
+
+  // 清空重建
+  boxes.length = 0;
+  for (var i = 0; i < topAddrList.length; i++) {
+    buildBoxTree(topAddrList[i], addrToPos[topAddrList[i]].baseX, addrToPos[topAddrList[i]].baseY, boxes);
   }
 
   return boxes;
