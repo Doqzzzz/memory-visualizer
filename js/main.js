@@ -1,5 +1,6 @@
 var stateManager = null;
 var renderer = null;
+var baseBoxes = null;
 var isEditMode = true;
 
 var currentLanguage = 'python';
@@ -19,13 +20,12 @@ function init() {
   renderPresetList();
   loadPreset(PRESETS[0]);
   bindEvents();
-  renderer.render([], null);
+  renderer.render([], null, null);
 
   window.addEventListener('resize', function() {
-    if (stateManager && stateManager.currentSnapshot) {
+    if (stateManager && baseBoxes) {
       renderer.resize();
-      var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
-      renderer.render(boxes, null);
+      renderer.render(baseBoxes, stateManager.currentSnapshot, null);
     }
   });
 }
@@ -93,13 +93,15 @@ function showEditView() {
 }
 
 function highlightLine(stepIndex) {
+  // stepIndex 是 0-based: 0 = 初始状态(不高亮), 1 = 第一行代码
   var allLines = codeDisplay.querySelectorAll('.line');
   for (var i = 0; i < allLines.length; i++) {
     allLines[i].classList.remove('current');
   }
-  if (stepIndex >= 0 && stepIndex < allLines.length) {
-    allLines[stepIndex].classList.add('current');
-    allLines[stepIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  // 第 0 步不高亮任何行
+  if (stepIndex > 0 && stepIndex - 1 < allLines.length) {
+    allLines[stepIndex - 1].classList.add('current');
+    allLines[stepIndex - 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 }
 
@@ -118,9 +120,13 @@ function runCode() {
     stateManager = new StateManager(events);
     if (stateManager.totalSteps > 0) {
       showCodeView();
+      // 用最终快照计算整体布局
+      renderer.resize();
+      baseBoxes = computeLayout(stateManager.finalSnapshot, renderer.w, renderer.h);
       goToStep(0);
     } else {
-      renderer.render([], null);
+      baseBoxes = null;
+      renderer.render([], null, null);
       updateStepUI();
     }
   } catch (err) {
@@ -131,7 +137,8 @@ function runCode() {
 
 function resetCode() {
   stateManager = null;
-  renderer.render([], null);
+  baseBoxes = null;
+  renderer.render([], null, null);
   updateStepUI();
   showEditView();
   if (PRESETS.length > 0) {
@@ -151,9 +158,11 @@ function goToStep(n) {
   stateManager.goToStep(n);
   renderer.resize();
   var snapshot = stateManager.currentSnapshot;
-  var boxes = computeLayout(snapshot, renderer.w, renderer.h);
+  if (!baseBoxes) {
+    baseBoxes = computeLayout(snapshot, renderer.w, renderer.h);
+  }
   var diff = stateManager.getDiff();
-  renderer.render(boxes, diff);
+  renderer.render(baseBoxes, snapshot, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
@@ -162,9 +171,8 @@ function prevStep() {
   if (!stateManager || stateManager.currentStep <= 0) return;
   stateManager.goToStep(stateManager.currentStep - 1);
   renderer.resize();
-  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(boxes, diff);
+  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
@@ -173,23 +181,22 @@ function nextStep() {
   if (!stateManager || stateManager.currentStep >= stateManager.totalSteps - 1) return;
   stateManager.next();
   renderer.resize();
-  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(boxes, diff);
+  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
 
 function updateStepUI() {
-  var total = stateManager ? stateManager.totalSteps : 0;
-  var current = stateManager ? stateManager.currentStep + 1 : 1;
+  var total = stateManager ? stateManager.totalSteps - 1 : 0; // totalSteps 含第 0 步
+  var current = stateManager ? stateManager.currentStep : 0;
 
   stepIndicator.textContent = '步骤 ' + current + '/' + total;
-  stepSlider.max = total > 0 ? total - 1 : 0;
-  stepSlider.value = stateManager ? stateManager.currentStep : 0;
+  stepSlider.max = total;
+  stepSlider.value = current;
 
   prevBtn.disabled = !stateManager || stateManager.currentStep === 0;
-  nextBtn.disabled = !stateManager || stateManager.currentStep >= total - 1;
+  nextBtn.disabled = !stateManager || stateManager.currentStep >= stateManager.totalSteps - 1;
 }
 
 function showError(msg) {

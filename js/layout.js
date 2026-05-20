@@ -21,7 +21,7 @@ function computeLayout(snapshot, canvasWidth, canvasHeight) {
     markReachable(variables[varNames[i]]);
   }
 
-  // 顶层：直接被变量引用的对象
+  // 顶层地址
   var topAddrs = [];
   var seen = {};
   for (var i = 0; i < varNames.length; i++) {
@@ -33,19 +33,30 @@ function computeLayout(snapshot, canvasWidth, canvasHeight) {
   var BOX_H = Math.max(62, Math.min(72, canvasHeight / 5));
   var GAP_X = Math.max(60, BOX_W * 0.5);
   var GAP_Y = Math.max(90, BOX_H * 1.5);
-  var CELL_W = Math.max(80, Math.min(100, canvasWidth / 10));
-  var CELL_H = 44;
-  var CELL_GAP = 20;
-  var CELL_Y_GAP = Math.max(50, CELL_H * 1.3);
+  // 子元素盒子用更小的，但足够看
+  var CELL_W = 64;
+  var CELL_H = 34;
+  var CELL_GAP = 12;
+  var CELL_Y_GAP = 48;
   var PADDING = 40;
 
   var totalWidth = topAddrs.length * (BOX_W + GAP_X) - GAP_X;
   var startX = Math.max(PADDING, (canvasWidth - totalWidth) / 2);
 
-  // 递归构建盒子（只包含可达对象）
-  function buildBox(addr, parentX, parentY) {
+  // 全局已分配盒子的地址 → 防止重复
+  var allocated = {};
+  // 共享引用列表：{ parentAddr → [refAddr, ...] } 需要画跨盒箭头
+  var sharedRefs = {};
+
+  function buildBox(addr, parentX, parentY, isTop) {
     var obj = objects[addr];
     if (!obj) return null;
+
+    // 已经在别处画过了 → 跳过，记录共享关系
+    if (allocated[addr]) {
+      return null;
+    }
+    allocated[addr] = true;
 
     var attachedVars = [];
     for (var j = 0; j < varNames.length; j++) {
@@ -53,39 +64,53 @@ function computeLayout(snapshot, canvasWidth, canvasHeight) {
     }
 
     var box = {
-      x: parentX, y: parentY, w: BOX_W, h: BOX_H,
+      x: parentX, y: parentY,
+      w: isTop ? BOX_W : CELL_W,
+      h: isTop ? BOX_H : CELL_H,
       address: addr, type: obj.type, value: obj.value,
-      refs: obj.refs, varNames: attachedVars, children: []
+      refs: obj.refs, varNames: attachedVars, children: [],
+      isTop: isTop
     };
 
     if (obj.type === 'list' && obj.refs) {
-      // 过滤：只保留可达的子元素
+      // 收集可达子元素
       var validRefs = [];
       for (var k = 0; k < obj.refs.length; k++) {
-        if (reachable[obj.refs[k]]) validRefs.push(obj.refs[k]);
+        if (reachable[obj.refs[k]]) validRefs.push({ index: k, addr: obj.refs[k] });
       }
       if (validRefs.length > 0) {
         var totalChildW = validRefs.length * (CELL_W + CELL_GAP) - CELL_GAP;
-        var cx = parentX + (BOX_W - totalChildW) / 2;
+        var cx = parentX + ((isTop ? BOX_W : CELL_W) - totalChildW) / 2;
         if (cx < PADDING) cx = PADDING;
-        var cy = parentY + BOX_H + GAP_Y;
+        var cy = parentY + (isTop ? BOX_H : CELL_H) + (isTop ? GAP_Y : CELL_Y_GAP);
 
         for (var k = 0; k < validRefs.length; k++) {
-          var childAddr = validRefs[k];
-          var child = objects[childAddr];
-          if (!child) continue;
+          var childAddr = validRefs[k].addr;
+          var childIdx = validRefs[k].index;
 
+          if (allocated[childAddr]) {
+            // 已存在 → 记录为共享引用
+            if (!sharedRefs[addr]) sharedRefs[addr] = [];
+            sharedRefs[addr].push(childAddr);
+            continue;
+          }
+
+          var childObj = objects[childAddr];
+          if (!childObj) continue;
+
+          allocated[childAddr] = true;
           var childBox = {
             x: cx, y: cy, w: CELL_W, h: CELL_H,
-            address: childAddr, type: child.type, value: child.value,
-            refs: child.refs, varNames: [], index: k, children: []
+            address: childAddr, type: childObj.type, value: childObj.value,
+            refs: childObj.refs, varNames: [], index: childIdx, children: [],
+            isTop: false
           };
 
           // 嵌套列表
-          if (child.type === 'list' && child.refs) {
+          if (childObj.type === 'list' && childObj.refs) {
             var validGrandRefs = [];
-            for (var m = 0; m < child.refs.length; m++) {
-              if (reachable[child.refs[m]]) validGrandRefs.push(child.refs[m]);
+            for (var m = 0; m < childObj.refs.length; m++) {
+              if (reachable[childObj.refs[m]]) validGrandRefs.push({ index: m, addr: childObj.refs[m] });
             }
             if (validGrandRefs.length > 0) {
               var grandTotalW = validGrandRefs.length * (CELL_W + CELL_GAP) - CELL_GAP;
@@ -93,12 +118,23 @@ function computeLayout(snapshot, canvasWidth, canvasHeight) {
               if (gx < PADDING) gx = PADDING;
               var gy = cy + CELL_H + CELL_Y_GAP;
               for (var m = 0; m < validGrandRefs.length; m++) {
-                var gc = objects[validGrandRefs[m]];
+                var gcAddr = validGrandRefs[m].addr;
+                var gcIdx = validGrandRefs[m].index;
+
+                if (allocated[gcAddr]) {
+                  if (!sharedRefs[childAddr]) sharedRefs[childAddr] = [];
+                  sharedRefs[childAddr].push(gcAddr);
+                  continue;
+                }
+
+                var gc = objects[gcAddr];
                 if (!gc) continue;
+                allocated[gcAddr] = true;
                 childBox.children.push({
                   x: gx, y: gy, w: CELL_W, h: CELL_H,
-                  address: validGrandRefs[m], type: gc.type, value: gc.value,
-                  refs: null, varNames: [], index: m, children: []
+                  address: gcAddr, type: gc.type, value: gc.value,
+                  refs: null, varNames: [], index: gcIdx, children: [],
+                  isTop: false
                 });
                 gx += CELL_W + CELL_GAP;
               }
@@ -119,8 +155,11 @@ function computeLayout(snapshot, canvasWidth, canvasHeight) {
   var y = Math.max(PADDING, (canvasHeight - BOX_H - GAP_Y - 80) / 3);
 
   for (var i = 0; i < topAddrs.length; i++) {
-    var box = buildBox(topAddrs[i], x, y);
-    if (box) boxes.push(box);
+    var box = buildBox(topAddrs[i], x, y, true);
+    if (box) {
+      box.sharedRefs = sharedRefs[topAddrs[i]] || [];
+      boxes.push(box);
+    }
     x += BOX_W + GAP_X;
   }
 
