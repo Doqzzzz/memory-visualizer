@@ -162,18 +162,31 @@ function interpretC(code) {
     return obj;
   }
 
+  function resolveValue(raw) {
+    // 先试数字字面量
+    var num = parseInt(raw);
+    if (!isNaN(num) && String(num) === raw.trim()) return { kind: 'literal', value: num };
+    // 变量引用：取该变量的值
+    var addr = variables[raw.trim()];
+    if (addr) return { kind: 'copy', value: objects[addr].value };
+    throw new Error('未定义的变量: ' + raw);
+  }
+
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
     var step = i + 1;
 
+    // int a = 1 或 int b = a
     var m = line.match(/^int\s+(\w+)\s*=\s*(.+)$/);
     if (m) {
-      var obj = allocObject('int', parseInt(m[2]));
+      var val = resolveValue(m[2]);
+      var obj = allocObject('int', val.value);
       variables[m[1]] = obj.address;
       emit('bind', m[1], obj.address, step);
       continue;
     }
 
+    // int *p = &a
     m = line.match(/^int\s*\*\s*(\w+)\s*=\s*&(\w+)$/);
     if (m) {
       var targetAddr = variables[m[2]];
@@ -184,6 +197,7 @@ function interpretC(code) {
       continue;
     }
 
+    // *p = 2
     m = line.match(/^\*(\w+)\s*=\s*(.+)$/);
     if (m) {
       var ptrAddr = variables[m[1]];
@@ -191,6 +205,18 @@ function interpretC(code) {
       var ptr = objects[ptrAddr];
       objects[ptr.value].value = parseInt(m[2]);
       emit('modify', m[1], ptrAddr, step);
+      continue;
+    }
+
+    // b = 2 或 b = a（普通赋值，无类型声明）
+    m = line.match(/^(\w+)\s*=\s*(.+)$/);
+    if (m) {
+      var existingAddr = variables[m[1]];
+      if (!existingAddr) throw new Error('未定义的变量: ' + m[1]);
+      var val = resolveValue(m[2]);
+      var newObj = allocObject('int', val.value);
+      variables[m[1]] = newObj.address;
+      emit('bind', m[1], newObj.address, step);
       continue;
     }
   }

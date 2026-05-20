@@ -7,6 +7,13 @@ const PRESETS = [
     description: '演示不可变对象：b 重新绑定不影响 a'
   },
   {
+    id: 'c-assign',
+    name: 'C 基本赋值',
+    language: 'c',
+    code: 'int a = 1\nint b = a\nb = 2',
+    description: '演示值语义：每个变量独立存储，b 修改不影响 a'
+  },
+  {
     id: 'c-pointer',
     name: 'C 指针',
     language: 'c',
