@@ -83,7 +83,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
       var sy = box.y + box.h;
       var tx = refPos.x + refPos.w / 2;
       var ty = refPos.y;
-      var bend = (sx < tx) ? 30 + j * 10 : -(30 + j * 10);
+      var bend = (sx < tx) ? 60 + j * 16 : -(60 + j * 16);
       self.drawRefArrow(sx, sy, tx, ty, '#cba6f7', idxLabel, bend);
     }
   }
@@ -152,10 +152,10 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     ctx.textAlign = 'right';
     ctx.fillText(obj ? obj.type : type, x + w - 4, y + h - 6);
   } else {
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = '#45475a';
-    ctx.lineWidth = 1;
-    ctx.fillStyle = 'rgba(49, 50, 68, 0.4)';
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = 'rgba(69, 71, 90, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = 'rgba(49, 50, 68, 0.2)';
     this.roundRect(x, y, w, h, 6);
     ctx.fill();
     ctx.stroke();
