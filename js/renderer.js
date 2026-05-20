@@ -21,110 +21,169 @@ Renderer.prototype.clear = function() {
   this.ctx.fillRect(0, 0, this.w, this.h);
 };
 
-Renderer.prototype.render = function(boxes, diff) {
+Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   this.resize();
   this.clear();
 
-  if (!boxes || boxes.length === 0) {
+  if (!baseBoxes || baseBoxes.length === 0 || !currentSnapshot) {
     this.drawEmpty();
     return;
   }
 
   var self = this;
+  var objects = currentSnapshot.objects;
+  var variables = currentSnapshot.variables;
   var diffSet = diff ? new Set(diff.added.concat(diff.modified)) : new Set();
 
-  // 收集所有盒子到 address→box 映射（包括子盒子）
-  var allBoxMap = {};
-  function collect(box) {
-    allBoxMap[box.address] = box;
-    if (box.children) {
-      for (var i = 0; i < box.children.length; i++) { collect(box.children[i]); }
+  function exists(addr) { return objects && !!objects[addr]; }
+
+  // 找出哪些变量名绑定到哪个地址
+  function getVarNames(addr) {
+    var names = [];
+    for (var v in variables) {
+      if (variables.hasOwnProperty(v) && variables[v] === addr) names.push(v);
     }
+    return names;
   }
-  for (var i = 0; i < boxes.length; i++) { collect(boxes[i]); }
 
-  // 记录已绘制子元素的地址，避免重复
-  var drawnChildAddrs = {};
-
-  // 画箭头（在盒子下层）
-  function drawArrows(box, parent) {
-    // 父子箭头：父到子
-    if (box.children && box.children.length > 0) {
+  // 递归收集子盒子中有实际数据的地址——仅当父盒子存在时画子盒子
+  function collectExistingAddrs(box, list) {
+    if (exists(box.address)) list.push(box.address);
+    if (box.children) {
       for (var i = 0; i < box.children.length; i++) {
-        var child = box.children[i];
-        self.drawArrow(
-          box.x + box.w / 2, box.y + box.h,
-          child.x + child.w / 2, child.y,
-          diffSet.has(child.address) ? '#a6e3a1' : '#cba6f7'
-        );
-        // 索引标签
-        self.ctx.fillStyle = '#6c7086';
-        self.ctx.font = '9px monospace';
-        self.ctx.textAlign = 'center';
-        self.ctx.fillText('[' + (child.index != null ? child.index : i) + ']',
-          child.x + child.w / 2, child.y - 5);
+        collectExistingAddrs(box.children[i], list);
       }
     }
-    // 递归子元素
+  }
+
+  // 先画竖直父子箭头（列表展开）
+  function drawParentChildArrows(box) {
+    if (!exists(box.address)) return;
     if (box.children) {
-      for (var i = 0; i < box.children.length; i++) { drawArrows(box.children[i], box); }
+      for (var i = 0; i < box.children.length; i++) {
+        var child = box.children[i];
+        if (exists(child.address)) {
+          self.drawArrow(
+            box.x + box.w / 2, box.y + box.h,
+            child.x + child.w / 2, child.y,
+            diffSet.has(child.address) ? '#a6e3a1' : '#cba6f7'
+          );
+          // 索引标签
+          var ctx = self.ctx;
+          ctx.fillStyle = '#6c7086';
+          ctx.font = '9px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('[' + (child.index != null ? child.index : i) + ']', child.x + child.w / 2, child.y - 5);
+        }
+        drawParentChildArrows(child);
+      }
     }
   }
 
-  for (var i = 0; i < boxes.length; i++) { drawArrows(boxes[i], null); }
+  // 先画引用箭头（跨盒子）
+  function drawRefArrowsForBox(box) {
+    if (!exists(box.address)) return;
+    var obj = objects[box.address];
+    if (!obj || !obj.refs) return;
+    for (var i = 0; i < obj.refs.length; i++) {
+      var target = self.findBox(obj.refs[i], baseBoxes);
+      if (target && exists(target.address) && target.address !== box.address) {
+        self.drawReferArrow(box, target, diffSet.has(obj.refs[i]) ? '#a6e3a1' : '#cba6f7');
+      }
+    }
+    if (box.children) {
+      for (var i = 0; i < box.children.length; i++) {
+        drawRefArrowsForBox(box.children[i]);
+      }
+    }
+  }
 
-  // 画盒子
+  // 画所有箭头（先画 = 在盒子下层）
+  for (var i = 0; i < baseBoxes.length; i++) {
+    drawParentChildArrows(baseBoxes[i]);
+    drawRefArrowsForBox(baseBoxes[i]);
+  }
+
+  // 再画所有盒子
   function drawAllBoxes(box) {
-    self.drawBox(box, diffSet);
+    var filled = exists(box.address);
+    var obj = filled ? objects[box.address] : null;
+    var names = filled ? getVarNames(box.address) : [];
+    self.drawBox(box.x, box.y, box.w, box.h, box.address, box.type, filled, names, obj, diffSet);
     if (box.children) {
-      for (var i = 0; i < box.children.length; i++) { drawAllBoxes(box.children[i]); }
+      for (var i = 0; i < box.children.length; i++) {
+        drawAllBoxes(box.children[i]);
+      }
     }
   }
-  for (var i = 0; i < boxes.length; i++) { drawAllBoxes(boxes[i]); }
+  for (var i = 0; i < baseBoxes.length; i++) {
+    drawAllBoxes(baseBoxes[i]);
+  }
 };
 
-Renderer.prototype.drawBox = function(box, diffSet) {
+Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varNames, obj, diffSet) {
   var ctx = this.ctx;
-  var x = box.x, y = box.y, w = box.w, h = box.h;
-  var isNew = diffSet && diffSet.has(box.address);
+  var isNew = diffSet && diffSet.has(address);
 
-  ctx.strokeStyle = isNew ? '#a6e3a1' : '#f9e2af';
-  ctx.lineWidth = isNew ? 2.5 : 1.5;
-  ctx.fillStyle = '#313244';
-  this.roundRect(x, y, w, h, 6);
-  ctx.fill();
-  ctx.stroke();
+  if (filled) {
+    // --- 实心盒子 ---
+    ctx.strokeStyle = isNew ? '#a6e3a1' : '#f9e2af';
+    ctx.lineWidth = isNew ? 2.5 : 1.5;
+    ctx.fillStyle = '#313244';
+    this.roundRect(x, y, w, h, 6);
+    ctx.fill();
+    ctx.stroke();
 
-  // 地址标签
-  ctx.fillStyle = '#6c7086';
-  ctx.font = '9px monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(box.address, x + 4, y + 12);
+    ctx.fillStyle = '#6c7086';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(address, x + 4, y + 12);
 
-  // 变量名
-  if (box.varNames && box.varNames.length > 0) {
-    ctx.fillStyle = '#89b4fa';
-    ctx.font = 'bold 12px monospace';
+    if (varNames && varNames.length > 0) {
+      ctx.fillStyle = '#89b4fa';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(varNames.join(', '), x + w / 2, y + 28);
+    }
+
+    var displayVal = '';
+    if (obj) {
+      displayVal = obj.value != null ? String(obj.value) : '';
+      if (obj.type === 'list') displayVal = 'list[' + (obj.refs ? obj.refs.length : 0) + ']';
+      else if (obj.type === 'pointer') displayVal = '→ ' + obj.value;
+    }
+    ctx.fillStyle = '#a6e3a1';
+    ctx.font = '14px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(box.varNames.join(', '), x + w / 2, y + 28);
+    var valY = (varNames && varNames.length > 0) ? y + 48 : y + 34;
+    ctx.fillText(displayVal, x + w / 2, valY);
+
+    var objType = obj ? obj.type : type;
+    ctx.fillStyle = '#cba6f7';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(objType, x + w - 4, y + h - 6);
+  } else {
+    // --- 虚线空框 ---
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#45475a';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(49, 50, 68, 0.4)';
+    this.roundRect(x, y, w, h, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#45475a';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(address, x + 4, y + 12);
+
+    ctx.fillStyle = '#45475a';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(type || '?', x + w / 2, y + h / 2 + 4);
   }
-
-  // 值
-  var displayVal = box.value != null ? String(box.value) : '';
-  if (box.type === 'list') displayVal = 'list[' + (box.refs ? box.refs.length : 0) + ']';
-  else if (box.type === 'pointer') displayVal = '→ ' + box.value;
-
-  ctx.fillStyle = '#a6e3a1';
-  ctx.font = '14px monospace';
-  ctx.textAlign = 'center';
-  var valY = (box.varNames && box.varNames.length > 0) ? y + 48 : y + 34;
-  ctx.fillText(displayVal, x + w / 2, valY);
-
-  // 类型标签
-  ctx.fillStyle = '#cba6f7';
-  ctx.font = '9px monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText(box.type, x + w - 4, y + h - 6);
 };
 
 Renderer.prototype.drawEmpty = function() {
@@ -135,14 +194,33 @@ Renderer.prototype.drawEmpty = function() {
   ctx.fillText('点击「运行」查看内存变化', this.w / 2, this.h / 2);
 };
 
+Renderer.prototype.drawReferArrow = function(srcBox, tgtBox, color) {
+  // 从源盒子右侧连到目标盒子左侧
+  this.drawArrow(srcBox.x + srcBox.w, srcBox.y + srcBox.h / 2, tgtBox.x, tgtBox.y + tgtBox.h / 2, color);
+};
+
+Renderer.prototype.findBox = function(addr, boxes) {
+  function search(list) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].address === addr) return list[i];
+      if (list[i].children) {
+        var found = search(list[i].children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return search(boxes);
+};
+
 Renderer.prototype.drawArrow = function(x1, y1, x2, y2, color) {
   var ctx = this.ctx;
   ctx.strokeStyle = color || '#cba6f7';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  var midX = (x1 + x2) / 2;
   ctx.moveTo(x1, y1);
-  ctx.bezierCurveTo(midX, y1, midX, y2, x2, y2);
+  // 直连——不绕弯
+  ctx.lineTo(x2, y2);
   ctx.stroke();
 
   ctx.fillStyle = color || '#cba6f7';
