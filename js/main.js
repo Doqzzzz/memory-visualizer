@@ -1,6 +1,5 @@
 var stateManager = null;
 var renderer = null;
-var baseBoxes = null;
 var isEditMode = true;
 
 var currentLanguage = 'python';
@@ -20,12 +19,13 @@ function init() {
   renderPresetList();
   loadPreset(PRESETS[0]);
   bindEvents();
-  renderer.render([], null, null);
+  renderer.render([], null);
 
   window.addEventListener('resize', function() {
-    if (stateManager && baseBoxes) {
+    if (stateManager && stateManager.currentSnapshot) {
       renderer.resize();
-      renderer.render(baseBoxes, stateManager.currentSnapshot, null);
+      var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
+      renderer.render(boxes, null);
     }
   });
 }
@@ -93,15 +93,15 @@ function showEditView() {
 }
 
 function highlightLine(stepIndex) {
-  // stepIndex 是 0-based: 0 = 初始状态(不高亮), 1 = 第一行代码
+  // step 0 → 无高亮，step 1 → 第 0 行，...
+  var lineIdx = stepIndex - 1;
   var allLines = codeDisplay.querySelectorAll('.line');
   for (var i = 0; i < allLines.length; i++) {
     allLines[i].classList.remove('current');
   }
-  // 第 0 步不高亮任何行
-  if (stepIndex > 0 && stepIndex - 1 < allLines.length) {
-    allLines[stepIndex - 1].classList.add('current');
-    allLines[stepIndex - 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (lineIdx >= 0 && lineIdx < allLines.length) {
+    allLines[lineIdx].classList.add('current');
+    allLines[lineIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 }
 
@@ -120,13 +120,9 @@ function runCode() {
     stateManager = new StateManager(events);
     if (stateManager.totalSteps > 0) {
       showCodeView();
-      // 用最终快照计算整体布局
-      renderer.resize();
-      baseBoxes = computeLayout(stateManager.finalSnapshot, renderer.w, renderer.h);
       goToStep(0);
     } else {
-      baseBoxes = null;
-      renderer.render([], null, null);
+      renderer.render([], null);
       updateStepUI();
     }
   } catch (err) {
@@ -137,8 +133,7 @@ function runCode() {
 
 function resetCode() {
   stateManager = null;
-  baseBoxes = null;
-  renderer.render([], null, null);
+  renderer.render([], null);
   updateStepUI();
   showEditView();
   if (PRESETS.length > 0) {
@@ -157,12 +152,9 @@ function goToStep(n) {
   if (!stateManager || stateManager.totalSteps === 0) return;
   stateManager.goToStep(n);
   renderer.resize();
-  var snapshot = stateManager.currentSnapshot;
-  if (!baseBoxes) {
-    baseBoxes = computeLayout(snapshot, renderer.w, renderer.h);
-  }
+  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(baseBoxes, snapshot, diff);
+  renderer.render(boxes, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
@@ -171,8 +163,9 @@ function prevStep() {
   if (!stateManager || stateManager.currentStep <= 0) return;
   stateManager.goToStep(stateManager.currentStep - 1);
   renderer.resize();
+  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
+  renderer.render(boxes, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
@@ -181,18 +174,19 @@ function nextStep() {
   if (!stateManager || stateManager.currentStep >= stateManager.totalSteps - 1) return;
   stateManager.next();
   renderer.resize();
+  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
+  renderer.render(boxes, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
 
 function updateStepUI() {
-  var total = stateManager ? stateManager.totalSteps - 1 : 0; // totalSteps 含第 0 步
+  var totalCodeLines = stateManager ? stateManager.totalSteps - 1 : 0; // 不含第 0 步
   var current = stateManager ? stateManager.currentStep : 0;
 
-  stepIndicator.textContent = '步骤 ' + current + '/' + total;
-  stepSlider.max = total;
+  stepIndicator.textContent = '步骤 ' + current + '/' + totalCodeLines;
+  stepSlider.max = stateManager ? stateManager.totalSteps - 1 : 0;
   stepSlider.value = current;
 
   prevBtn.disabled = !stateManager || stateManager.currentStep === 0;

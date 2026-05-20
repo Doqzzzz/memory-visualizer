@@ -1,6 +1,13 @@
 class StateManager {
   constructor(events) {
-    this.events = events || [];
+    // 第 0 步：初始空状态
+    this.events = [{ step: 0, action: 'init', varName: null, address: null, snapshot: { variables: {}, objects: {} } }];
+    if (events && events.length > 0) {
+      for (var i = 0; i < events.length; i++) {
+        events[i].step = i + 1;
+      }
+      this.events = this.events.concat(events);
+    }
     this._step = 0;
   }
 
@@ -8,7 +15,6 @@ class StateManager {
   get totalSteps() { return this.events.length; }
 
   get currentSnapshot() {
-    if (this.events.length === 0) return null;
     return this.events[this._step].snapshot;
   }
 
@@ -26,11 +32,11 @@ class StateManager {
 
   reset() {
     this._step = 0;
-    this.events = [];
+    this.events = [{ step: 0, action: 'init', varName: null, address: null, snapshot: { variables: {}, objects: {} } }];
   }
 
   getDiff() {
-    if (this._step === 0) return { added: Object.keys(this.currentSnapshot.objects), modified: [], removed: [] };
+    if (this._step === 0) return { added: [], modified: [], removed: [] };
     var curr = this.currentSnapshot.objects;
     var prev = this.prevSnapshot.objects;
     var added = [];
