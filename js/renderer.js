@@ -125,23 +125,27 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     drawRefArrowsForBox(baseBoxes[i]);
   }
 
-  // 再画所有盒子 —— baseBoxes 有全部历史子元素，当前 refs 中存在的填实心
-  function drawBoxTree(posBox, currentAddr) {
-    var filled = exists(currentAddr);
+  // 再画所有盒子 —— 子元素是否实心取决于是否在父对象当前 refs 中
+  function drawBoxTree(posBox, currentAddr, parentRefSet) {
+    var existsInObjs = exists(currentAddr);
+    var filled = existsInObjs;
+    // 如果有父 refs 集合，子元素必须在父 refs 中才算实心
+    if (parentRefSet && existsInObjs) {
+      filled = parentRefSet.hasOwnProperty(currentAddr);
+    }
     var obj = filled ? objects[currentAddr] : null;
     var names = filled ? getVarNames(currentAddr) : [];
     self.drawBox(posBox.x, posBox.y, posBox.w, posBox.h, currentAddr, obj ? obj.type : posBox.type, filled, names, obj, diffSet);
 
-    // 画出所有子元素位置，当前 refs 中存在的递归填实心
+    // 为本对象的子元素准备 refs 集合
+    var myRefSet = null;
+    if (filled && obj && obj.refs && posBox.children && posBox.children.length > 0) {
+      myRefSet = {};
+      for (var r = 0; r < obj.refs.length; r++) { myRefSet[obj.refs[r]] = true; }
+    }
     if (posBox.children && posBox.children.length > 0) {
-      var refSet = (filled && obj && obj.refs) ? {} : null;
-      if (refSet) {
-        for (var r = 0; r < obj.refs.length; r++) { refSet[obj.refs[r]] = true; }
-      }
       for (var i = 0; i < posBox.children.length; i++) {
-        var childPos = posBox.children[i];
-        var childAddr = childPos.address;
-        drawBoxTree(childPos, childAddr);
+        drawBoxTree(posBox.children[i], posBox.children[i].address, myRefSet);
       }
     }
   }
