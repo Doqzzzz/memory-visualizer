@@ -46,11 +46,31 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   }
 
   // ---- 画所有引用箭头 ----
+  // 第一遍：收集嵌套列表的标签前缀
+  var nestedLabels = {};
   for (var i = 0; i < baseBoxes.length; i++) {
     var box = baseBoxes[i];
     if (!exists(box.address)) continue;
     var obj = objects[box.address];
     if (!obj || !obj.refs) continue;
+    var names = getVarNames(box.address);
+    var prefix = (names && names.length > 0) ? names[0] : '';
+    for (var j = 0; j < obj.refs.length; j++) {
+      var ra = obj.refs[j];
+      var ro = objects[ra];
+      if (ro && ro.type === 'list') nestedLabels[ra] = prefix + '[' + j + ']';
+    }
+  }
+
+  // 第二遍：画箭头
+  for (var i = 0; i < baseBoxes.length; i++) {
+    var box = baseBoxes[i];
+    if (!exists(box.address)) continue;
+    var obj = objects[box.address];
+    if (!obj || !obj.refs) continue;
+
+    var parentNames = getVarNames(box.address);
+    var prefix = nestedLabels[box.address] || (parentNames && parentNames.length > 0 ? parentNames[0] : '');
 
     for (var j = 0; j < obj.refs.length; j++) {
       var refAddr = obj.refs[j];
@@ -58,14 +78,13 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
       if (!refPos) continue;
       if (!exists(refAddr)) continue;
 
-      // 画箭头
-      var parentNames = getVarNames(box.address);
-      var idxLabel = (parentNames && parentNames.length > 0 ? parentNames[0] : '') + '[' + j + ']';
-      self.drawRefArrow(
-        box.x + box.w / 2, box.y + box.h,
-        refPos.x + refPos.w / 2, refPos.y,
-        '#cba6f7', idxLabel
-      );
+      var idxLabel = prefix + '[' + j + ']';
+      var sx = box.x + box.w / 2;
+      var sy = box.y + box.h;
+      var tx = refPos.x + refPos.w / 2;
+      var ty = refPos.y;
+      var bend = (sx < tx) ? 30 + j * 10 : -(30 + j * 10);
+      self.drawRefArrow(sx, sy, tx, ty, '#cba6f7', idxLabel, bend);
     }
   }
 
@@ -162,14 +181,15 @@ Renderer.prototype.drawEmpty = function() {
   ctx.fillText('点击「运行」查看内存变化', this.w / 2, this.h / 2);
 };
 
-Renderer.prototype.drawRefArrow = function(x1, y1, x2, y2, color, label) {
+Renderer.prototype.drawRefArrow = function(x1, y1, x2, y2, color, label, bend) {
+  bend = bend || 0;
   var ctx = this.ctx;
   ctx.strokeStyle = color || '#cba6f7';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  var midX = (x1 + x2) / 2;
+  var midY = (y1 + y2) / 2;
   ctx.moveTo(x1, y1);
-  ctx.bezierCurveTo(midX, y1, midX, y2, x2, y2);
+  ctx.bezierCurveTo(x1 + bend, midY, x2 + bend, midY, x2, y2);
   ctx.stroke();
 
   // 箭头尖

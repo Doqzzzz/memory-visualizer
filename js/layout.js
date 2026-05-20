@@ -123,48 +123,76 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
     });
   }
 
-  // ---- 扁平放置子元素盒子（去重，共享地址只画一份） ----
-  var refAddrToPos = {};
-  if (refAddrList.length > 0) {
-    var totalRefW = refAddrList.length * (CELL_W + CELL_GAP) - CELL_GAP;
-    var refX = Math.max(PADDING, (canvasWidth - totalRefW) / 2);
-    var refY = rowY + 20; // 顶层盒子下方
-
-    // 如果需要嵌套（二维列表），递归添加更深层子元素
-    var extraRefs = {};
-    for (var j = 0; j < refAddrList.length; j++) {
-      var ra = refAddrList[j];
-      var child = objects[ra];
-      if (child && child.refs) {
-        var deepChildren = (allChildAddrs && allChildAddrs[ra]) ? Object.keys(allChildAddrs[ra]) : child.refs;
-        for (var k = 0; k < deepChildren.length; k++) {
-          if (!allRefAddrs[deepChildren[k]]) {
-            extraRefs[deepChildren[k]] = true;
-          }
-        }
-      }
+  // ---- 分层放置子元素 ----
+  // 第一层：本身是 list 的子元素（嵌套列表），作为中间节点
+  var nestedListAddrs = {};
+  for (var j = 0; j < refAddrList.length; j++) {
+    var ra = refAddrList[j];
+    var child = objects[ra];
+    if (child && child.type === 'list') {
+      nestedListAddrs[ra] = true;
     }
-    var deepList = Object.keys(extraRefs);
-    var allRefWithDeep = refAddrList.concat(deepList);
+  }
+  var nestedList = Object.keys(nestedListAddrs);
 
-    var totW = allRefWithDeep.length * (CELL_W + CELL_GAP) - CELL_GAP;
-    refX = Math.max(PADDING, (canvasWidth - totW) / 2);
+  // 第二层：值类型子元素（int/str/float 等） + 嵌套列表的子元素
+  var valueAddrs = {};
+  for (var j = 0; j < refAddrList.length; j++) {
+    var ra = refAddrList[j];
+    var child = objects[ra];
+    if (!child || child.type !== 'list') {
+      valueAddrs[ra] = true;
+    }
+  }
+  // 纳嵌套列表的子元素
+  for (var j = 0; j < nestedList.length; j++) {
+    var nl = nestedList[j];
+    var nlObj = objects[nl];
+    var deepChildren = (allChildAddrs && allChildAddrs[nl]) ? Object.keys(allChildAddrs[nl]) : (nlObj && nlObj.refs ? nlObj.refs : []);
+    for (var k = 0; k < deepChildren.length; k++) {
+      valueAddrs[deepChildren[k]] = true;
+    }
+  }
+  var valueList = Object.keys(valueAddrs);
 
-    for (var j = 0; j < allRefWithDeep.length; j++) {
-      var ra = allRefWithDeep[j];
-      var child = objects[ra] || { type: '?', value: null, refs: null, address: ra };
-      refAddrToPos[ra] = { x: refX, y: refY, w: CELL_W, h: CELL_H };
+  var refAddrToPos = {};
+  var refY = rowY + 20;
+
+  // 放置嵌套列表盒子（中间层）
+  if (nestedList.length > 0) {
+    var nestedW = nestedList.length * (CELL_W + CELL_GAP) - CELL_GAP;
+    var nestedX = Math.max(PADDING, (canvasWidth - nestedW) / 2);
+    for (var j = 0; j < nestedList.length; j++) {
+      var addr = nestedList[j];
+      var obj = objects[addr] || { type: 'list', value: null, refs: null, address: addr };
+      refAddrToPos[addr] = { x: nestedX, y: refY, w: CELL_W, h: CELL_H };
       result.push({
-        x: refX, y: refY, w: CELL_W, h: CELL_H,
-        address: ra, type: child.type || '?', value: child.value,
-        refs: child.refs, varNames: []
+        x: nestedX, y: refY, w: CELL_W, h: CELL_H,
+        address: addr, type: obj.type || 'list', value: obj.value,
+        refs: obj.refs, varNames: []
       });
-      refX += CELL_W + CELL_GAP;
+      nestedX += CELL_W + CELL_GAP;
+    }
+    refY += CELL_H + ROW_GAP;
+  }
+
+  // 放置值元素盒子（底层共享）
+  if (valueList.length > 0) {
+    var valueW = valueList.length * (CELL_W + CELL_GAP) - CELL_GAP;
+    var valueX = Math.max(PADDING, (canvasWidth - valueW) / 2);
+    for (var j = 0; j < valueList.length; j++) {
+      var addr = valueList[j];
+      var obj = objects[addr] || { type: '?', value: null, refs: null, address: addr };
+      refAddrToPos[addr] = { x: valueX, y: refY, w: CELL_W, h: CELL_H };
+      result.push({
+        x: valueX, y: refY, w: CELL_W, h: CELL_H,
+        address: addr, type: obj.type || '?', value: obj.value,
+        refs: obj.refs, varNames: []
+      });
+      valueX += CELL_W + CELL_GAP;
     }
   }
 
-  // 把位置信息挂到返回数组上（给渲染器用）
   result._refPositions = refAddrToPos;
-
   return result;
 }
