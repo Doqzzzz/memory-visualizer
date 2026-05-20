@@ -66,7 +66,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
           self.drawArrow(
             box.x + box.w / 2, box.y + box.h,
             child.x + child.w / 2, child.y,
-            diffSet.has(child.address) ? '#a6e3a1' : '#cba6f7'
+            '#cba6f7'
           );
           // 索引标签
           var ctx = self.ctx;
@@ -80,21 +80,36 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     }
   }
 
-  // 先画引用箭头（跨盒子）
+  // 收集所有已经是父子关系的地址对（避免双重箭头）
+  function collectParentChildPairs(box, set) {
+    if (box.children) {
+      for (var i = 0; i < box.children.length; i++) {
+        set[box.address + '->' + box.children[i].address] = true;
+        set[box.children[i].address + '->' + box.address] = true;
+        collectParentChildPairs(box.children[i], set);
+      }
+    }
+  }
+  var pcPairs = {};
+  for (var i = 0; i < baseBoxes.length; i++) { collectParentChildPairs(baseBoxes[i], pcPairs); }
+
+  // 先画引用箭头（跨盒子，排除父子关系）
   function drawRefArrowsForBox(box) {
     if (!exists(box.address)) return;
     var obj = objects[box.address];
     if (!obj || !obj.refs) return;
     for (var i = 0; i < obj.refs.length; i++) {
-      var target = self.findBox(obj.refs[i], baseBoxes);
+      var refAddr = obj.refs[i];
+      var target = self.findBox(refAddr, baseBoxes);
       if (target && exists(target.address) && target.address !== box.address) {
-        self.drawReferArrow(box, target, diffSet.has(obj.refs[i]) ? '#a6e3a1' : '#cba6f7');
+        var key = box.address + '->' + target.address;
+        if (!pcPairs[key]) {
+          self.drawReferArrow(box, target, '#cba6f7');
+        }
       }
     }
     if (box.children) {
-      for (var i = 0; i < box.children.length; i++) {
-        drawRefArrowsForBox(box.children[i]);
-      }
+      for (var i = 0; i < box.children.length; i++) { drawRefArrowsForBox(box.children[i]); }
     }
   }
 
@@ -149,7 +164,7 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     var displayVal = '';
     if (obj) {
       displayVal = obj.value != null ? String(obj.value) : '';
-      if (obj.type === 'list') displayVal = 'list[' + (obj.refs ? obj.refs.length : 0) + ']';
+      if (obj.type === 'list') displayVal = '';
       else if (obj.type === 'pointer') displayVal = '→ ' + obj.value;
     }
     ctx.fillStyle = '#a6e3a1';

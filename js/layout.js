@@ -1,4 +1,4 @@
-function computeLayout(snapshot, canvasWidth, canvasHeight) {
+function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs) {
   if (!snapshot || !snapshot.objects) return [];
 
   var objects = snapshot.objects;
@@ -25,10 +25,30 @@ function computeLayout(snapshot, canvasWidth, canvasHeight) {
     var addr = variables[varNames[i]];
     if (!seen[addr]) { seen[addr] = true; topAddrList.push(addr); }
   }
-  // 也包含不在最终 variables 中的中间对象（如 C 赋值过程中产生的临时值）
+  // 收集所有列表子元素地址（这些已作为 children 展示，不做顶层盒子）
+  var childAddrs = {};
+  function markChildren(addr, visited) {
+    if (visited[addr]) return;
+    visited[addr] = true;
+    var o = objects[addr];
+    if (o && o.refs) {
+      for (var r = 0; r < o.refs.length; r++) {
+        childAddrs[o.refs[r]] = true;
+        markChildren(o.refs[r], visited);
+      }
+    }
+  }
+  var markVisit = {};
   for (var addr in objects) {
-    if (!objects.hasOwnProperty(addr)) continue;
-    if (!seen[addr]) { seen[addr] = true; topAddrList.push(addr); }
+    if (objects.hasOwnProperty(addr)) markChildren(addr, markVisit);
+  }
+
+  // 加入曾在任意步骤绑定过变量、但不在最终 variables 中的中间对象（如 C 临时值）
+  if (allVarAddrs) {
+    for (var addr in allVarAddrs) {
+      if (!allVarAddrs.hasOwnProperty(addr)) continue;
+      if (!seen[addr] && !childAddrs[addr]) { seen[addr] = true; topAddrList.push(addr); }
+    }
   }
 
   // 计算总布局宽度（所有顶层盒子 + 间距），再居中偏移

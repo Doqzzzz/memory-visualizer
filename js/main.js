@@ -25,7 +25,7 @@ function init() {
   window.addEventListener('resize', function() {
     if (stateManager && baseBoxes) {
       renderer.resize();
-      renderer.render(baseBoxes, stateManager.currentSnapshot, null);
+      renderer.render(baseBoxes, stateManager.currentSnapshot, stateManager.currentStep > 0 ? stateManager.getDiff() : null);
     }
   });
 }
@@ -121,9 +121,17 @@ function runCode() {
     stateManager = new StateManager(events);
     if (stateManager.totalSteps > 0) {
       showCodeView();
-      // 用最终快照计算整体布局
+      // 搜集所有曾经绑定过变量的地址（含中间步骤）
+      var allVarAddrs = {};
+      for (var i = 0; i < stateManager.events.length; i++) {
+        var vars = stateManager.events[i].snapshot.variables;
+        for (var v in vars) {
+          if (vars.hasOwnProperty(v)) allVarAddrs[vars[v]] = true;
+        }
+      }
+      // 用最终快照 + 全部历史变量地址计算布局
       renderer.resize();
-      baseBoxes = computeLayout(stateManager.finalSnapshot, renderer.w, renderer.h);
+      baseBoxes = computeLayout(stateManager.finalSnapshot, renderer.w, renderer.h, allVarAddrs);
       goToStep(0);
     } else {
       baseBoxes = null;
