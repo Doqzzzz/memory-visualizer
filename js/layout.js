@@ -101,12 +101,12 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
   }
 
   // ---- 放置顶层盒子 ----
-  // 收集每棵树的宽度，按行排列
   var treeWidths = [];
   for (var i = 0; i < topAddrList.length; i++) {
     treeWidths.push(treeWidth(topAddrList[i]));
   }
 
+  var addrToPos = {};
   var rowY = PADDING;
   var row = [];
   var rowW = 0;
@@ -119,8 +119,7 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
     }
     var x = startX;
     for (var i = 0; i < row.length; i++) {
-      row[i].baseX = x;
-      row[i].baseY = rowY;
+      addrToPos[row[i].addr] = { baseX: x, baseY: rowY };
       x += row[i].tw + GAP_X;
     }
     rowY += maxH + GAP_Y;
@@ -139,8 +138,6 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
   flushRow();
 
   // ---- 构建盒子树 ----
-  var addrToPos = {}; // addr -> { baseX, baseY }
-
   for (var i = 0; i < topAddrList.length; i++) {
     buildBoxTree(topAddrList[i], addrToPos[topAddrList[i]].baseX, addrToPos[topAddrList[i]].baseY, boxes);
   }
@@ -212,49 +209,6 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
       address: addr, type: obj.type, value: obj.value,
       refs: obj.refs, varNames: attachedVars, children: children
     });
-  }
-
-  // ---- 填充 addrToPos（给 flushRow 使用） ----
-  function preAssign() {
-    // 重新执行 row 放置逻辑来填充 addrToPos
-    // （因为 flushRow 使用了 row[i].addr 和 row[i].baseX/baseY）
-  }
-
-  // 重新执行行放置
-  rowY = PADDING;
-  row = [];
-  rowW = 0;
-
-  function flushRow2() {
-    var startX = Math.max(PADDING, (canvasWidth - rowW) / 2);
-    var maxH = 0;
-    for (var i = 0; i < row.length; i++) {
-      maxH = Math.max(maxH, treeHeight(row[i].addr));
-    }
-    var x = startX;
-    for (var i = 0; i < row.length; i++) {
-      addrToPos[row[i].addr] = { baseX: x, baseY: rowY };
-      x += row[i].tw + GAP_X;
-    }
-    rowY += maxH + GAP_Y;
-    row = [];
-    rowW = 0;
-  }
-
-  for (var i = 0; i < topAddrList.length; i++) {
-    var tw = treeWidths[i];
-    if (i > 0 && rowW + tw + GAP_X > canvasWidth - PADDING * 2) {
-      flushRow2();
-    }
-    row.push({ addr: topAddrList[i], tw: tw });
-    rowW += tw + (row.length > 1 ? GAP_X : 0);
-  }
-  flushRow2();
-
-  // 清空重建
-  boxes.length = 0;
-  for (var i = 0; i < topAddrList.length; i++) {
-    buildBoxTree(topAddrList[i], addrToPos[topAddrList[i]].baseX, addrToPos[topAddrList[i]].baseY, boxes);
   }
 
   return boxes;
