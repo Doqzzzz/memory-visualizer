@@ -83,6 +83,40 @@ body {
   font-size: 14px; line-height: 1.7; resize: none; outline: none;
   tab-size: 2;
 }
+#code-editor.hidden { display: none; }
+
+#code-display {
+  flex: 1; background: var(--bg);
+  border: none; padding: 16px; margin: 0;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 14px; line-height: 1.7; overflow: auto;
+  color: var(--subtext); white-space: pre-wrap;
+  display: none;
+  counter-reset: line;
+}
+#code-display.visible { display: block; }
+
+#code-display .line {
+  display: block; padding: 0 8px; border-radius: 3px;
+  counter-increment: line;
+}
+#code-display .line::before {
+  content: counter(line);
+  display: inline-block; width: 24px; margin-right: 16px;
+  color: var(--overlay); text-align: right; font-size: 12px;
+  user-select: none;
+}
+#code-display .line.active {
+  background: rgba(203, 166, 247, 0.2);
+  color: var(--text);
+  border-left: 3px solid var(--purple);
+}
+#code-display .line.current {
+  background: rgba(166, 227, 161, 0.25);
+  color: var(--green);
+  border-left: 3px solid var(--green);
+  font-weight: bold;
+}
 
 #memory-panel {
   flex: 5; display: flex; flex-direction: column;
