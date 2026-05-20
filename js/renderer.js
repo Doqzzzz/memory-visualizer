@@ -67,20 +67,16 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     for (var i = 0; i < box.children.length; i++) {
       var childPos = box.children[i];
       if (!exists(childPos.address) || !refSet.hasOwnProperty(childPos.address)) continue;
-      var parentNames = getVarNames(box.address);
-      var prefix = (parentNames && parentNames.length > 0) ? parentNames[0] : '';
-      var idxLabel = prefix ? prefix + '[' + refSet[childPos.address] + ']' : '[' + refSet[childPos.address] + ']';
-
       self.drawArrow(
         box.x + box.w / 2, box.y + box.h,
         childPos.x + childPos.w / 2, childPos.y,
         '#cba6f7'
       );
       var ctx = self.ctx;
-      ctx.fillStyle = '#89b4fa';
-      ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = '#6c7086';
+      ctx.font = '9px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(idxLabel, childPos.x + childPos.w / 2, childPos.y - 6);
+      ctx.fillText('[' + refSet[childPos.address] + ']', childPos.x + childPos.w / 2, childPos.y - 5);
       drawChildrenArrows(childPos, childPos.address);
     }
   }
@@ -130,7 +126,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   }
 
   // 再画所有盒子 —— 子元素是否实心取决于是否在父对象当前 refs 中
-  function drawBoxTree(posBox, currentAddr, parentRefSet) {
+  function drawBoxTree(posBox, currentAddr, parentRefSet, indexInParent, parentVarName) {
     var existsInObjs = exists(currentAddr);
     var filled = existsInObjs;
     if (parentRefSet && existsInObjs) {
@@ -138,16 +134,25 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     }
     var obj = filled ? objects[currentAddr] : null;
     var names = filled ? getVarNames(currentAddr) : [];
-    self.drawBox(posBox.x, posBox.y, posBox.w, posBox.h, currentAddr, obj ? obj.type : posBox.type, filled, names, obj, diffSet);
-
-    var myRefSet = null;
-    if (filled && obj && obj.refs && posBox.children && posBox.children.length > 0) {
-      myRefSet = {};
-      for (var r = 0; r < obj.refs.length; r++) { myRefSet[obj.refs[r]] = true; }
+    // 子盒子的下标标签
+    var subLabel = '';
+    if (indexInParent != null && parentVarName) {
+      subLabel = parentVarName + '[' + indexInParent + ']';
     }
+    self.drawBox(posBox.x, posBox.y, posBox.w, posBox.h, currentAddr, obj ? obj.type : posBox.type, filled, names, obj, diffSet, subLabel);
+
+    // 收集当前 refs 地址→索引映射
+    var refIndexMap = null;
+    if (filled && obj && obj.refs && posBox.children && posBox.children.length > 0) {
+      refIndexMap = {};
+      for (var r = 0; r < obj.refs.length; r++) { refIndexMap[obj.refs[r]] = r; }
+    }
+    var parentVarName = (names && names.length > 0) ? names[0] : '';
     if (posBox.children && posBox.children.length > 0) {
       for (var i = 0; i < posBox.children.length; i++) {
-        drawBoxTree(posBox.children[i], posBox.children[i].address, myRefSet);
+        var childAddr = posBox.children[i].address;
+        var idx = (refIndexMap && refIndexMap.hasOwnProperty(childAddr)) ? refIndexMap[childAddr] : null;
+        drawBoxTree(posBox.children[i], childAddr, refIndexMap, idx, parentVarName);
       }
     }
   }
@@ -158,7 +163,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   }
 };
 
-Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varNames, obj, diffSet) {
+Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varNames, obj, diffSet, subLabel) {
   var ctx = this.ctx;
   var isNew = diffSet && diffSet.has(address);
 
@@ -220,6 +225,14 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     ctx.font = '12px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(type || '?', x + w / 2, y + h / 2 + 4);
+  }
+
+  // 子盒子下标标签（盒子下方外侧）
+  if (subLabel) {
+    ctx.fillStyle = '#89b4fa';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(subLabel, x + w / 2, y + h + 14);
   }
 };
 
