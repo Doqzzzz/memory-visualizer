@@ -26,48 +26,57 @@ body {
 
 /* 工具栏 */
 .toolbar {
-  display: flex; gap: 10px; padding: 8px 16px;
+  display: flex; align-items: center; gap: 10px; padding: 8px 16px;
   background: var(--surface); border-bottom: 1px solid var(--overlay);
 }
-.toolbar button, .toolbar select {
+
+.toolbar button {
   background: var(--overlay); color: var(--text);
-  border: 1px solid var(--overlay); padding: 6px 14px;
+  border: 1px solid var(--overlay); padding: 6px 16px;
   border-radius: 4px; cursor: pointer; font-size: 13px;
 }
+
 .toolbar button:hover { background: var(--purple); color: var(--bg); }
+
+.toolbar-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--subtext);
+  font-family: monospace;
+}
 
 /* 三区布局 */
 .layout {
   display: flex; flex: 1; overflow: hidden;
 }
 
-/* 左侧预设面板 */
 #preset-panel {
-  width: 180px; min-width: 180px;
-  background: var(--surface);
+  width: 180px; background: var(--surface);
   border-right: 1px solid var(--overlay); padding: 12px;
   overflow-y: auto;
 }
+
 #preset-panel h3 {
   color: var(--yellow); font-size: 13px;
   margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;
 }
+
 #preset-list { list-style: none; }
+
 #preset-list li {
   padding: 8px 10px; border-radius: 4px; cursor: pointer;
   font-size: 12px; margin-bottom: 2px; color: var(--subtext);
-  transition: background 0.15s;
-}
-#preset-list li:hover { background: var(--overlay); color: var(--text); }
-#preset-list li.active {
-  background: var(--purple); color: var(--bg); font-weight: bold;
+  transition: background 0.15s, color 0.15s;
 }
 
-/* 中间代码面板 */
+#preset-list li:hover { background: var(--overlay); color: var(--text); }
+#preset-list li.active { background: var(--purple); color: var(--bg); font-weight: bold; }
+
 #code-panel {
   flex: 3; display: flex; flex-direction: column;
   border-right: 1px solid var(--overlay);
 }
+
 #code-editor {
   flex: 1; background: var(--bg); color: var(--green);
   border: none; padding: 16px; font-family: 'Cascadia Code', 'Fira Code', monospace;
@@ -75,46 +84,59 @@ body {
   tab-size: 2;
 }
 
-/* 右侧内存面板 */
 #memory-panel {
-  flex: 5; display: flex; flex-direction: column; position: relative;
+  flex: 5; display: flex; flex-direction: column;
+  position: relative;
 }
-#memory-canvas { flex: 1; width: 100%; display: block; }
 
-/* 步骤控制条 */
+#memory-canvas {
+  flex: 1; width: 100%; display: block;
+}
+
 #step-controls {
   display: flex; align-items: center; justify-content: center; gap: 12px;
   padding: 10px 16px; background: var(--surface);
   border-top: 1px solid var(--overlay);
 }
+
 #step-controls button {
   background: var(--overlay); color: var(--text);
-  border: none; padding: 6px 14px; border-radius: 4px;
+  border: none; padding: 6px 16px; border-radius: 4px;
   cursor: pointer; font-size: 13px;
 }
+
 #step-controls button:hover:not(:disabled) { background: var(--purple); }
 #step-controls button:disabled { opacity: 0.4; cursor: default; }
+
 #step-indicator {
   font-size: 13px; color: var(--yellow); min-width: 80px; text-align: center;
 }
-#step-slider { flex: 1; accent-color: var(--purple); cursor: pointer; }
+
+#step-slider { flex: 1; accent-color: var(--purple); height: 4px; cursor: pointer; }
+
+#step-slider::-webkit-slider-thumb {
+  width: 16px; height: 16px;
+  background: var(--purple); border-radius: 50%;
+  cursor: pointer;
+}
+
+/* 错误提示 */
+.error-toast {
+  position: fixed; top: 48px; right: 20px;
+  background: var(--red); color: white;
+  padding: 10px 20px; border-radius: 6px;
+  font-size: 13px; z-index: 100;
+  animation: fadeOut 3s forwards;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 /* 滚动条 */
 #preset-panel::-webkit-scrollbar { width: 4px; }
 #preset-panel::-webkit-scrollbar-thumb { background: var(--overlay); border-radius: 2px; }
 #code-editor::-webkit-scrollbar { width: 6px; }
 #code-editor::-webkit-scrollbar-thumb { background: var(--overlay); border-radius: 3px; }
-
-/* Toast 错误提示 */
-.error-toast {
-  position: fixed; top: 60px; right: 20px;
-  background: var(--red); color: white;
-  padding: 10px 20px; border-radius: 6px;
-  font-size: 13px; z-index: 100;
-  animation: fadeOut 3s forwards;
-}
-@keyframes fadeOut {
-  0% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { opacity: 0; }
-}
