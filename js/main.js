@@ -123,15 +123,28 @@ function runCode() {
       showCodeView();
       // 搜集所有曾经绑定过变量的地址（含中间步骤）
       var allVarAddrs = {};
+      // 按父列表地址搜集所有历史子元素
+      var allChildAddrs = {};
       for (var i = 0; i < stateManager.events.length; i++) {
-        var vars = stateManager.events[i].snapshot.variables;
+        var snap = stateManager.events[i].snapshot;
+        var vars = snap.variables;
         for (var v in vars) {
           if (vars.hasOwnProperty(v)) allVarAddrs[vars[v]] = true;
         }
+        var objs = snap.objects;
+        for (var addr in objs) {
+          if (objs.hasOwnProperty(addr) && objs[addr].refs) {
+            if (!allChildAddrs[addr]) allChildAddrs[addr] = {};
+            for (var j = 0; j < objs[addr].refs.length; j++) {
+              var ca = objs[addr].refs[j];
+              if (!allChildAddrs[addr][ca]) allChildAddrs[addr][ca] = j;
+            }
+          }
+        }
       }
-      // 用最终快照 + 全部历史变量地址计算布局
+      // 用最终快照 + 全部历史地址计算布局
       renderer.resize();
-      baseBoxes = computeLayout(stateManager.finalSnapshot, renderer.w, renderer.h, allVarAddrs);
+      baseBoxes = computeLayout(stateManager.finalSnapshot, renderer.w, renderer.h, allVarAddrs, allChildAddrs);
       goToStep(0);
     } else {
       baseBoxes = null;

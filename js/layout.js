@@ -1,4 +1,4 @@
-function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs) {
+function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChildAddrs) {
   if (!snapshot || !snapshot.objects) return [];
 
   var objects = snapshot.objects;
@@ -94,20 +94,22 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs) {
     var childStartX = x;
     var childY = y + BOX_H + GAP_Y;
 
-    if (obj.type === 'list' && obj.refs) {
+    var actualChildren = (allChildAddrs && allChildAddrs[addr]) ? Object.keys(allChildAddrs[addr]) : (obj.refs || []);
+
+    if (obj.type === 'list' && actualChildren.length > 0) {
       // 计算子元素总宽度
-      var totalChildW = obj.refs.length * (CELL_W + CELL_GAP) - CELL_GAP;
+      var totalChildW = actualChildren.length * (CELL_W + CELL_GAP) - CELL_GAP;
       var cx = x + (BOX_W - totalChildW) / 2;
       if (cx < PADDING) cx = PADDING;
 
-      for (var k = 0; k < obj.refs.length; k++) {
-        var childAddr = obj.refs[k];
-        var child = objects[childAddr];
+      for (var k = 0; k < actualChildren.length; k++) {
+        var childAddr = actualChildren[k];
+        var child = objects[childAddr] || (allChildAddrs && allChildAddrs[addr] ? { type: '?', value: null, refs: null, address: childAddr } : null);
         if (!child) continue;
 
         var childBox = {
           x: cx, y: childY, w: CELL_W, h: CELL_H,
-          address: childAddr, type: child.type, value: child.value,
+          address: childAddr, type: child.type || '?', value: child.value,
           refs: child.refs, varNames: [], index: k, children: []
         };
 

@@ -56,15 +56,17 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     }
   }
 
-  // 先画竖直父子箭头（列表展开）—— 用当前快照的 refs 匹配 baseBoxes 位置
+  // 先画竖直父子箭头（列表展开）—— 当前快照 refs 中有此地址的才画箭头
   function drawChildrenArrows(box, currentAddr) {
     if (!exists(currentAddr)) return;
     var obj = objects[currentAddr];
     if (!obj || !obj.refs || !box.children) return;
-    for (var i = 0; i < obj.refs.length; i++) {
-      if (!exists(obj.refs[i])) continue;
+    // 建当前 refs 地址查找表
+    var refSet = {};
+    for (var r = 0; r < obj.refs.length; r++) { refSet[obj.refs[r]] = r; }
+    for (var i = 0; i < box.children.length; i++) {
       var childPos = box.children[i];
-      if (!childPos) continue;
+      if (!exists(childPos.address) || !refSet.hasOwnProperty(childPos.address)) continue;
       self.drawArrow(
         box.x + box.w / 2, box.y + box.h,
         childPos.x + childPos.w / 2, childPos.y,
@@ -74,8 +76,8 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
       ctx.fillStyle = '#6c7086';
       ctx.font = '9px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('[' + i + ']', childPos.x + childPos.w / 2, childPos.y - 5);
-      drawChildrenArrows(childPos, obj.refs[i]);
+      ctx.fillText('[' + refSet[childPos.address] + ']', childPos.x + childPos.w / 2, childPos.y - 5);
+      drawChildrenArrows(childPos, childPos.address);
     }
   }
 
@@ -123,19 +125,23 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     drawRefArrowsForBox(baseBoxes[i]);
   }
 
-  // 再画所有盒子 —— 用当前快照的 refs 匹配 baseBoxes 位置
+  // 再画所有盒子 —— baseBoxes 有全部历史子元素，当前 refs 中存在的填实心
   function drawBoxTree(posBox, currentAddr) {
     var filled = exists(currentAddr);
     var obj = filled ? objects[currentAddr] : null;
     var names = filled ? getVarNames(currentAddr) : [];
     self.drawBox(posBox.x, posBox.y, posBox.w, posBox.h, currentAddr, obj ? obj.type : posBox.type, filled, names, obj, diffSet);
 
-    if (filled && obj && obj.refs && posBox.children) {
-      for (var i = 0; i < obj.refs.length; i++) {
+    // 画出所有子元素位置，当前 refs 中存在的递归填实心
+    if (posBox.children && posBox.children.length > 0) {
+      var refSet = (filled && obj && obj.refs) ? {} : null;
+      if (refSet) {
+        for (var r = 0; r < obj.refs.length; r++) { refSet[obj.refs[r]] = true; }
+      }
+      for (var i = 0; i < posBox.children.length; i++) {
         var childPos = posBox.children[i];
-        if (childPos && exists(obj.refs[i])) {
-          drawBoxTree(childPos, obj.refs[i]);
-        }
+        var childAddr = childPos.address;
+        drawBoxTree(childPos, childAddr);
       }
     }
   }
