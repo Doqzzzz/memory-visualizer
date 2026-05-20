@@ -33,7 +33,7 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
   var self = this;
   var objects = currentSnapshot.objects;
   var variables = currentSnapshot.variables;
-  var diffSet = diff ? new Set(diff.added.concat(diff.modified)) : new Set();
+  var refPositions = baseBoxes._refPositions || {};
 
   function exists(addr) { return objects && !!objects[addr]; }
 
@@ -45,57 +45,59 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     return names;
   }
 
-  // ---- 先画所有引用箭头 ----
+  // ---- 画所有引用箭头 ----
   for (var i = 0; i < baseBoxes.length; i++) {
     var box = baseBoxes[i];
     if (!exists(box.address)) continue;
     var obj = objects[box.address];
     if (!obj || !obj.refs) continue;
-    for (var r = 0; r < obj.refs.length; r++) {
-      var target = self.findBox(obj.refs[r], baseBoxes);
-      if (target && exists(target.address)) {
-        self.drawReferArrow(box, target, '#cba6f7');
+
+    for (var j = 0; j < obj.refs.length; j++) {
+      var refAddr = obj.refs[j];
+      var refPos = refPositions[refAddr];
+      if (!refPos) continue;
+      if (!exists(refAddr)) continue;
+
+      // 画箭头
+      var parentNames = getVarNames(box.address);
+      var idxLabel = (parentNames && parentNames.length > 0 ? parentNames[0] : '') + '[' + j + ']';
+      self.drawRefArrow(
+        box.x + box.w / 2, box.y + box.h,
+        refPos.x + refPos.w / 2, refPos.y,
+        '#cba6f7', idxLabel
+      );
+    }
+  }
+
+  // 收集子元素地址（有 ref 指向它的才算子元素）
+  var childAddrSet = {};
+  for (var i = 0; i < baseBoxes.length; i++) {
+    var b = baseBoxes[i];
+    if (!exists(b.address)) continue;
+    var o = objects[b.address];
+    if (o && o.refs) {
+      for (var j = 0; j < o.refs.length; j++) {
+        childAddrSet[o.refs[j]] = true;
       }
     }
   }
 
-  // ---- 再画所有盒子（扁平，无嵌套） ----
+  // ---- 画所有盒子 ----
   for (var i = 0; i < baseBoxes.length; i++) {
     var box = baseBoxes[i];
+    var isChild = childAddrSet.hasOwnProperty(box.address);
     var filled = exists(box.address);
     var obj = filled ? objects[box.address] : null;
     var names = filled ? getVarNames(box.address) : [];
-    // 下标标签（被引用盒子，找谁引用了它）
-    var subLabel = '';
-    if (filled && box.isChild && !names.length) {
-      // 找引用此地址的父列表
-      for (var j = 0; j < baseBoxes.length; j++) {
-        var parent = baseBoxes[j];
-        if (!exists(parent.address)) continue;
-        var pobj = objects[parent.address];
-        if (!pobj || !pobj.refs) continue;
-        for (var ri = 0; ri < pobj.refs.length; ri++) {
-          if (pobj.refs[ri] === box.address) {
-            var pnames = getVarNames(parent.address);
-            var prefix = (pnames && pnames.length > 0) ? pnames[0] : parent.type;
-            subLabel = prefix + '[' + ri + ']';
-            break;
-          }
-        }
-        if (subLabel) break;
-      }
-    }
-    self.drawBox(box.x, box.y, box.w, box.h, box.address, obj ? obj.type : box.type, filled, names, obj, diffSet, subLabel);
+    self.drawBox(box.x, box.y, box.w, box.h, box.address, obj ? obj.type : box.type, filled, names, obj, isChild);
   }
 };
 
-Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varNames, obj, diffSet, subLabel) {
+Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varNames, obj, isChild) {
   var ctx = this.ctx;
-  var isNew = diffSet && diffSet.has(address);
 
   if (filled) {
-    // --- 实心盒子 ---
-    ctx.strokeStyle = '#f9e2af';
+    ctx.strokeStyle = isChild ? '#cba6f7' : '#f9e2af';
     ctx.lineWidth = 1.5;
     ctx.fillStyle = '#313244';
     this.roundRect(x, y, w, h, 6);
@@ -126,13 +128,11 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     var valY = (varNames && varNames.length > 0) ? y + 48 : y + 34;
     ctx.fillText(displayVal, x + w / 2, valY);
 
-    var objType = obj ? obj.type : type;
     ctx.fillStyle = '#cba6f7';
     ctx.font = '9px monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(objType, x + w - 4, y + h - 6);
+    ctx.fillText(obj ? obj.type : type, x + w - 4, y + h - 6);
   } else {
-    // --- 虚线空框 ---
     ctx.setLineDash([4, 4]);
     ctx.strokeStyle = '#45475a';
     ctx.lineWidth = 1;
@@ -142,23 +142,15 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = '#45475a';
-    ctx.font = '9px monospace';
+    ctx.fillStyle = '#bac2de';
+    ctx.font = '10px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(address, x + 4, y + 12);
+    ctx.fillText(address, x + 6, y + 14);
 
     ctx.fillStyle = '#45475a';
     ctx.font = '12px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(type || '?', x + w / 2, y + h / 2 + 4);
-  }
-
-  // 子盒子下标标签（盒子下方外侧）
-  if (subLabel) {
-    ctx.fillStyle = '#89b4fa';
-    ctx.font = 'bold 10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(subLabel, x + w / 2, y + h + 14);
   }
 };
 
@@ -170,26 +162,7 @@ Renderer.prototype.drawEmpty = function() {
   ctx.fillText('点击「运行」查看内存变化', this.w / 2, this.h / 2);
 };
 
-Renderer.prototype.drawReferArrow = function(srcBox, tgtBox, color) {
-  // 从源盒子右侧连到目标盒子左侧
-  this.drawArrow(srcBox.x + srcBox.w, srcBox.y + srcBox.h / 2, tgtBox.x, tgtBox.y + tgtBox.h / 2, color);
-};
-
-Renderer.prototype.findBox = function(addr, boxes) {
-  function search(list) {
-    for (var i = 0; i < list.length; i++) {
-      if (list[i].address === addr) return list[i];
-      if (list[i].children) {
-        var found = search(list[i].children);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-  return search(boxes);
-};
-
-Renderer.prototype.drawArrow = function(x1, y1, x2, y2, color) {
+Renderer.prototype.drawRefArrow = function(x1, y1, x2, y2, color, label) {
   var ctx = this.ctx;
   ctx.strokeStyle = color || '#cba6f7';
   ctx.lineWidth = 1.5;
@@ -199,6 +172,7 @@ Renderer.prototype.drawArrow = function(x1, y1, x2, y2, color) {
   ctx.bezierCurveTo(midX, y1, midX, y2, x2, y2);
   ctx.stroke();
 
+  // 箭头尖
   ctx.fillStyle = color || '#cba6f7';
   var angle = Math.atan2(y2 - y1, x2 - x1);
   var ax = x2 - 8 * Math.cos(angle);
@@ -209,6 +183,14 @@ Renderer.prototype.drawArrow = function(x1, y1, x2, y2, color) {
   ctx.lineTo(ax + 4 * Math.sin(angle), ay - 4 * Math.cos(angle));
   ctx.closePath();
   ctx.fill();
+
+  // 标签
+  if (label) {
+    ctx.fillStyle = '#89b4fa';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, (x1 + x2) / 2, (y1 + y2) / 2 - 6);
+  }
 };
 
 Renderer.prototype.roundRect = function(x, y, w, h, r) {
