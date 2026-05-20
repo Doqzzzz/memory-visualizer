@@ -88,10 +88,26 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     }
   }
 
+  // ---- 收集当前所有被引用的地址 ----
+  var currentRefsSet = {};
+  for (var i = 0; i < baseBoxes.length; i++) {
+    var b = baseBoxes[i];
+    if (!exists(b.address)) continue;
+    var o = objects[b.address];
+    if (o && o.refs) {
+      for (var j = 0; j < o.refs.length; j++) {
+        currentRefsSet[o.refs[j]] = true;
+      }
+    }
+  }
+
   // ---- 画所有盒子 ----
   for (var i = 0; i < baseBoxes.length; i++) {
     var box = baseBoxes[i];
-    var filled = exists(box.address);
+    var existsInObjs = exists(box.address);
+    var isVar = getVarNames(box.address).length > 0;
+    // 非变量盒子：必须在当前 refs 中才算实心
+    var filled = existsInObjs && (isVar || currentRefsSet.hasOwnProperty(box.address));
     var obj = filled ? objects[box.address] : null;
     var names = filled ? getVarNames(box.address) : [];
     self.drawBox(box.x, box.y, box.w, box.h, box.address, obj ? obj.type : box.type, filled, names, obj);
