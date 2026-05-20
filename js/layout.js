@@ -113,20 +113,20 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
           refs: child.refs, varNames: [], index: k, children: []
         };
 
-        // 嵌套列表
-        if (child.type === 'list' && child.refs) {
-          var grandTotalW = child.refs.length * (CELL_W + CELL_GAP) - CELL_GAP;
+        // 嵌套列表 —— 同样使用全部历史子元素
+        var nestedChildren = (allChildAddrs && allChildAddrs[childAddr]) ? Object.keys(allChildAddrs[childAddr]) : (child.refs || []);
+        if ((child.type === 'list' || nestedChildren.length > 0) && nestedChildren.length > 0) {
+          var grandTotalW = nestedChildren.length * (CELL_W + CELL_GAP) - CELL_GAP;
           var gx = cx + (CELL_W - grandTotalW) / 2;
           if (gx < PADDING) gx = PADDING;
           var gy = childY + CELL_H + CELL_Y_GAP;
 
-          for (var m = 0; m < child.refs.length; m++) {
-            var gcAddr = child.refs[m];
-            var gc = objects[gcAddr];
-            if (!gc) continue;
+          for (var m = 0; m < nestedChildren.length; m++) {
+            var gcAddr = nestedChildren[m];
+            var gc = objects[gcAddr] || { type: '?', value: null, refs: null, address: gcAddr };
             childBox.children.push({
               x: gx, y: gy, w: CELL_W, h: CELL_H,
-              address: gcAddr, type: gc.type, value: gc.value,
+              address: gcAddr, type: gc.type || '?', value: gc.value,
               refs: null, varNames: [], index: m, children: []
             });
             gx += CELL_W + CELL_GAP;

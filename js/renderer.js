@@ -142,12 +142,12 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
       refIndexMap = {};
       for (var r = 0; r < obj.refs.length; r++) { refIndexMap[obj.refs[r]] = r; }
     }
-    var parentVarName = (names && names.length > 0) ? names[0] : '';
+    var childPrefix = subLabel || ((names && names.length > 0) ? names[0] : '');
     if (posBox.children && posBox.children.length > 0) {
       for (var i = 0; i < posBox.children.length; i++) {
         var childAddr = posBox.children[i].address;
         var idx = (refIndexMap && refIndexMap.hasOwnProperty(childAddr)) ? refIndexMap[childAddr] : null;
-        drawBoxTree(posBox.children[i], childAddr, refIndexMap, idx, parentVarName);
+        drawBoxTree(posBox.children[i], childAddr, refIndexMap, idx, childPrefix);
       }
     }
   }
