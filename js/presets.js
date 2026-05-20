@@ -43,9 +43,9 @@ const PRESETS = [
   },
   {
     id: 'py-deep',
-    name: '浅拷贝 vs 深拷贝',
+    name: '深拷贝',
     language: 'python',
-    code: 'a = [[1, 2], [3, 4]]\nb = a.copy()\nc = deepcopy(a)\nb[0][0] = 99',
-    description: '嵌套列表：浅拷贝共享内层，深拷贝完全隔离'
+    code: 'a = [1, 2]\nb = deepcopy(a)\nb[0] = 99',
+    description: '深拷贝：b 的元素完全独立，修改不影响 a'
   }
 ];
