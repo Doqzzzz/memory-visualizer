@@ -134,15 +134,15 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     ctx.stroke();
 
     ctx.fillStyle = '#bac2de';
-    ctx.font = '11px monospace';
+    ctx.font = 'bold 13px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(address, x + 8, y + 16);
+    ctx.fillText(address, x + 10, y + 20);
 
     if (varNames && varNames.length > 0) {
       ctx.fillStyle = '#89b4fa';
-      ctx.font = 'bold 14px monospace';
+      ctx.font = 'bold 16px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(varNames.join(', '), x + w / 2, y + 32);
+      ctx.fillText(varNames.join(', '), x + w / 2, y + 38);
     }
 
     var displayVal = '';
@@ -152,15 +152,15 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
       else if (obj.type === 'pointer') displayVal = '→ ' + obj.value;
     }
     ctx.fillStyle = '#a6e3a1';
-    ctx.font = '16px monospace';
+    ctx.font = 'bold 20px monospace';
     ctx.textAlign = 'center';
-    var valY = (varNames && varNames.length > 0) ? y + 54 : y + 40;
+    var valY = (varNames && varNames.length > 0) ? y + 62 : y + 48;
     ctx.fillText(displayVal, x + w / 2, valY);
 
     ctx.fillStyle = '#cba6f7';
-    ctx.font = '10px monospace';
+    ctx.font = '11px monospace';
     ctx.textAlign = 'right';
-    ctx.fillText(obj ? obj.type : type, x + w - 6, y + h - 8);
+    ctx.fillText(obj ? obj.type : type, x + w - 8, y + h - 8);
   } else {
     ctx.fillStyle = 'rgba(49, 50, 68, 0.15)';
     this.roundRect(x, y, w, h, 6);
@@ -169,10 +169,10 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
     ctx.fillStyle = '#bac2de';
     ctx.font = '10px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(address, x + 8, y + 16);
+    ctx.fillText(address, x + 10, y + 20);
 
     ctx.fillStyle = '#45475a';
-    ctx.font = '13px monospace';
+    ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(type || '?', x + w / 2, y + h / 2 + 5);
   }
@@ -212,9 +212,9 @@ Renderer.prototype.drawRefArrow = function(x1, y1, x2, y2, color, label, bend) {
   // 标签
   if (label) {
     ctx.fillStyle = '#89b4fa';
-    ctx.font = 'bold 12px monospace';
+    ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(label, (x1 + x2) / 2, (y1 + y2) / 2 - 8);
+    ctx.fillText(label, (x1 + x2) / 2, (y1 + y2) / 2 - 10);
   }
 };
 

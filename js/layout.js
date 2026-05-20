@@ -4,17 +4,17 @@ function computeLayout(snapshot, canvasWidth, canvasHeight, allVarAddrs, allChil
   var objects = snapshot.objects;
   var variables = snapshot.variables;
 
-  var BOX_W = Math.max(160, Math.min(200, canvasWidth / 5));
-  var BOX_H = Math.max(72, Math.min(84, canvasHeight / 4));
-  var GAP_X = Math.max(80, BOX_W * 0.5);
-  var GAP_Y = Math.max(120, BOX_H * 1.6);
+  var BOX_W = Math.max(200, canvasWidth / 4);
+  var BOX_H = Math.max(90, canvasHeight / 3);
+  var GAP_X = Math.max(100, BOX_W * 0.6);
+  var GAP_Y = Math.max(140, BOX_H * 1.6);
 
-  var CELL_W = Math.max(100, Math.min(120, canvasWidth / 8));
-  var CELL_H = 52;
-  var CELL_GAP = 28;
-  var ROW_GAP = 64;
+  var CELL_W = Math.max(120, canvasWidth / 6);
+  var CELL_H = 64;
+  var CELL_GAP = 32;
+  var ROW_GAP = 72;
 
-  var PADDING = 50;
+  var PADDING = 60;
 
   // ---- 收集顶层地址 ----
   var varNames = Object.keys(variables);
