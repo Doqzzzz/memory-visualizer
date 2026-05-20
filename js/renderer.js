@@ -31,7 +31,7 @@ Renderer.prototype.render = function(boxes, diff) {
   }
 
   var self = this;
-  var diffSet = diff ? new Set(diff.added.concat(diff.modified)) : new Set();
+  var diffSet = (diff && diff.added && diff.modified) ? new Set(diff.added.concat(diff.modified)) : new Set();
 
   // 建立地址→盒子的全局索引
   var addrMap = {};
