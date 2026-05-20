@@ -72,11 +72,6 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
         childPos.x + childPos.w / 2, childPos.y,
         '#cba6f7'
       );
-      var ctx = self.ctx;
-      ctx.fillStyle = '#6c7086';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('[' + refSet[childPos.address] + ']', childPos.x + childPos.w / 2, childPos.y - 5);
       drawChildrenArrows(childPos, childPos.address);
     }
   }
