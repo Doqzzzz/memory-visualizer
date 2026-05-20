@@ -21,17 +21,20 @@ Renderer.prototype.clear = function() {
   this.ctx.fillRect(0, 0, this.w, this.h);
 };
 
-Renderer.prototype.render = function(boxes, diff) {
+Renderer.prototype.render = function(baseBoxes, snapshot, diff) {
   this.resize();
   this.clear();
 
-  if (!boxes || boxes.length === 0) {
+  if (!baseBoxes || baseBoxes.length === 0) {
     this.drawEmpty();
     return;
   }
 
   var self = this;
+  var objects = snapshot ? snapshot.objects : {};
   var diffSet = (diff && diff.added && diff.modified) ? new Set(diff.added.concat(diff.modified)) : new Set();
+
+  function exists(addr) { return !!objects[addr]; }
 
   // 建立地址→盒子的全局索引
   var addrMap = {};
@@ -39,52 +42,56 @@ Renderer.prototype.render = function(boxes, diff) {
     addrMap[b.address] = b;
     if (b.children) { for (var i = 0; i < b.children.length; i++) indexBox(b.children[i]); }
   }
-  for (var i = 0; i < boxes.length; i++) indexBox(boxes[i]);
+  for (var i = 0; i < baseBoxes.length; i++) indexBox(baseBoxes[i]);
 
-  // 先画共享引用虚线箭头（跨盒引用）
+  // 共享引用虚线箭头（仅当源和目标都存在时画）
   function drawSharedArrows(box) {
+    if (!exists(box.address)) return;
     if (box.sharedRefs && box.sharedRefs.length > 0) {
       for (var i = 0; i < box.sharedRefs.length; i++) {
         var target = addrMap[box.sharedRefs[i]];
-        if (target) {
+        if (target && exists(target.address)) {
           self.drawSharedArrow(box, target);
         }
       }
     }
     if (box.children) { for (var i = 0; i < box.children.length; i++) drawSharedArrows(box.children[i]); }
   }
-  for (var i = 0; i < boxes.length; i++) drawSharedArrows(boxes[i]);
+  for (var i = 0; i < baseBoxes.length; i++) drawSharedArrows(baseBoxes[i]);
 
-  // 父子箭头
+  // 父子箭头（仅当父子都存在时画）
   function drawParentChildArrows(box) {
+    if (!exists(box.address)) return;
     if (box.children && box.children.length > 0) {
       for (var i = 0; i < box.children.length; i++) {
         var child = box.children[i];
-        self.drawArrow(
-          box.x + box.w / 2, box.y + box.h,
-          child.x + child.w / 2, child.y,
-          diffSet.has(child.address) ? '#a6e3a1' : '#cba6f7'
-        );
-        // 索引标签
-        self.ctx.fillStyle = '#6c7086';
-        self.ctx.font = '9px monospace';
-        self.ctx.textAlign = 'center';
-        self.ctx.fillText('[' + (child.index != null ? child.index : i) + ']',
-          child.x + child.w / 2, child.y - 5);
+        if (exists(child.address)) {
+          self.drawArrow(
+            box.x + box.w / 2, box.y + box.h,
+            child.x + child.w / 2, child.y,
+            diffSet.has(child.address) ? '#a6e3a1' : '#cba6f7'
+          );
+          self.ctx.fillStyle = '#6c7086';
+          self.ctx.font = '9px monospace';
+          self.ctx.textAlign = 'center';
+          self.ctx.fillText('[' + (child.index != null ? child.index : i) + ']',
+            child.x + child.w / 2, child.y - 5);
+        }
       }
     }
     if (box.children) {
       for (var i = 0; i < box.children.length; i++) drawParentChildArrows(box.children[i]);
     }
   }
-  for (var i = 0; i < boxes.length; i++) drawParentChildArrows(boxes[i]);
+  for (var i = 0; i < baseBoxes.length; i++) drawParentChildArrows(baseBoxes[i]);
 
-  // 画盒子
+  // 画盒子（区分实/空）
   function drawAllBoxes(box) {
-    self.drawBox(box, diffSet);
+    var filled = exists(box.address);
+    self.drawBox(box, filled, diffSet);
     if (box.children) { for (var i = 0; i < box.children.length; i++) drawAllBoxes(box.children[i]); }
   }
-  for (var i = 0; i < boxes.length; i++) drawAllBoxes(boxes[i]);
+  for (var i = 0; i < baseBoxes.length; i++) drawAllBoxes(baseBoxes[i]);
 };
 
 Renderer.prototype.drawSharedArrow = function(src, tgt) {
@@ -112,11 +119,35 @@ Renderer.prototype.drawSharedArrow = function(src, tgt) {
   ctx.fill();
 };
 
-Renderer.prototype.drawBox = function(box, diffSet) {
+Renderer.prototype.drawBox = function(box, filled, diffSet) {
   var ctx = this.ctx;
   var x = box.x, y = box.y, w = box.w, h = box.h;
-  var isNew = diffSet && diffSet.has(box.address);
 
+  if (!filled) {
+    // 虚线空框
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#45475a';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(49, 50, 68, 0.3)';
+    this.roundRect(x, y, w, h, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#45475a';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(box.address, x + 4, y + 12);
+
+    ctx.fillStyle = '#45475a';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(box.type || '?', x + w / 2, y + h / 2 + 4);
+    return;
+  }
+
+  // 实心盒子
+  var isNew = diffSet && diffSet.has(box.address);
   ctx.strokeStyle = isNew ? '#a6e3a1' : '#f9e2af';
   ctx.lineWidth = isNew ? 2.5 : 1.5;
   ctx.fillStyle = '#313244';

@@ -1,5 +1,6 @@
 var stateManager = null;
 var renderer = null;
+var baseBoxes = null;
 var isEditMode = true;
 
 var currentLanguage = 'python';
@@ -19,13 +20,12 @@ function init() {
   renderPresetList();
   loadPreset(PRESETS[0]);
   bindEvents();
-  renderer.render([], null);
+  renderer.render([], null, null);
 
   window.addEventListener('resize', function() {
-    if (stateManager && stateManager.currentSnapshot) {
+    if (stateManager && baseBoxes) {
       renderer.resize();
-      var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
-      renderer.render(boxes, null);
+      renderer.render(baseBoxes, stateManager.currentSnapshot, null);
     }
   });
 }
@@ -93,7 +93,7 @@ function showEditView() {
 }
 
 function highlightLine(stepIndex) {
-  // step 0 → 无高亮，step 1 → 第 0 行，...
+  // step 0 → 无高亮
   var lineIdx = stepIndex - 1;
   var allLines = codeDisplay.querySelectorAll('.line');
   for (var i = 0; i < allLines.length; i++) {
@@ -120,9 +120,17 @@ function runCode() {
     stateManager = new StateManager(events);
     if (stateManager.totalSteps > 0) {
       showCodeView();
+      renderer.resize();
+      // 用最后一步的快照预计算所有盒子位置
+      var lastStep = stateManager.totalSteps - 1;
+      stateManager.goToStep(lastStep);
+      var finalSnap = stateManager.currentSnapshot;
+      baseBoxes = computeLayout(finalSnap, renderer.w, renderer.h);
+      // 回到第 0 步展示空盒子
       goToStep(0);
     } else {
-      renderer.render([], null);
+      baseBoxes = null;
+      renderer.render([], null, null);
       updateStepUI();
     }
   } catch (err) {
@@ -133,7 +141,8 @@ function runCode() {
 
 function resetCode() {
   stateManager = null;
-  renderer.render([], null);
+  baseBoxes = null;
+  renderer.render([], null, null);
   updateStepUI();
   showEditView();
   if (PRESETS.length > 0) {
@@ -152,9 +161,8 @@ function goToStep(n) {
   if (!stateManager || stateManager.totalSteps === 0) return;
   stateManager.goToStep(n);
   renderer.resize();
-  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(boxes, diff);
+  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
@@ -163,9 +171,8 @@ function prevStep() {
   if (!stateManager || stateManager.currentStep <= 0) return;
   stateManager.goToStep(stateManager.currentStep - 1);
   renderer.resize();
-  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(boxes, diff);
+  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
@@ -174,15 +181,14 @@ function nextStep() {
   if (!stateManager || stateManager.currentStep >= stateManager.totalSteps - 1) return;
   stateManager.next();
   renderer.resize();
-  var boxes = computeLayout(stateManager.currentSnapshot, renderer.w, renderer.h);
   var diff = stateManager.getDiff();
-  renderer.render(boxes, diff);
+  renderer.render(baseBoxes, stateManager.currentSnapshot, diff);
   highlightLine(stateManager.currentStep);
   updateStepUI();
 }
 
 function updateStepUI() {
-  var totalCodeLines = stateManager ? stateManager.totalSteps - 1 : 0; // 不含第 0 步
+  var totalCodeLines = stateManager ? stateManager.totalSteps - 1 : 0;
   var current = stateManager ? stateManager.currentStep : 0;
 
   stepIndicator.textContent = '步骤 ' + current + '/' + totalCodeLines;
