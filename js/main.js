@@ -80,7 +80,7 @@ function runCode() {
     var events = interpret(code, language);
     stateManager = new StateManager(events);
     if (stateManager.totalSteps > 0) {
-      goToStep(0);
+      goToStep(stateManager.totalSteps - 1);
     } else {
       renderer.render([], null);
       updateStepUI();
