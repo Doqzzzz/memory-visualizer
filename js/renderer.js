@@ -118,9 +118,8 @@ Renderer.prototype.render = function(baseBoxes, currentSnapshot, diff) {
     }
   }
 
-  // 画所有箭头（先画 = 在盒子下层）
+  // 画跨盒子引用箭头
   for (var i = 0; i < baseBoxes.length; i++) {
-    drawParentChildArrows(baseBoxes[i]);
     drawRefArrowsForBox(baseBoxes[i]);
   }
 
