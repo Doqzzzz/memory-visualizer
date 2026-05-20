@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>内存可视化</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <select id="lang-select">
+      <option value="python">Python</option>
+      <option value="c">C</option>
+    </select>
+    <button id="run-btn">运行</button>
+    <button id="reset-btn">重置</button>
+  </header>
+
+  <main class="layout">
+    <aside id="preset-panel">
+      <h3>预设场景</h3>
+      <ul id="preset-list"></ul>
+    </aside>
+
+    <section id="code-panel">
+      <textarea id="code-editor" spellcheck="false"></textarea>
+    </section>
+
+    <section id="memory-panel">
+      <canvas id="memory-canvas"></canvas>
+      <div id="step-controls">
+        <button id="prev-btn">上一步</button>
+        <span id="step-indicator">步骤 0/0</span>
+        <button id="next-btn">下一步</button>
+        <input type="range" id="step-slider" min="0" max="0" value="0">
+      </div>
+    </section>
+  </main>
+
+  <script src="js/presets.js"></script>
+  <script src="js/interpreter.js"></script>
+  <script src="js/stateManager.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
