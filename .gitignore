@@ -1,3 +1,6 @@
+# 头脑风暴临时文件
+.superpowers/
+
 # Claude 本地文件
 .claude/memory/
 .claude/settings.local.json
