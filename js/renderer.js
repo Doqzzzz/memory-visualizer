@@ -158,8 +158,8 @@ Renderer.prototype.drawBox = function(x, y, w, h, address, type, filled, varName
 
   if (filled) {
     // --- 实心盒子 ---
-    ctx.strokeStyle = isNew ? '#a6e3a1' : '#f9e2af';
-    ctx.lineWidth = isNew ? 2.5 : 1.5;
+    ctx.strokeStyle = '#f9e2af';
+    ctx.lineWidth = 1.5;
     ctx.fillStyle = '#313244';
     this.roundRect(x, y, w, h, 6);
     ctx.fill();
