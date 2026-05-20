@@ -35,6 +35,13 @@ const PRESETS = [
     description: '演示嵌套列表的引用结构'
   },
   {
+    id: 'py-list-ref',
+    name: '列表引用',
+    language: 'python',
+    code: 'a = [1, 2]\nb = a\nb[0] = 99',
+    description: '演示列表引用：b = a 指向同一列表，改 b 影响 a'
+  },
+  {
     id: 'py-shallow',
     name: '浅拷贝',
     language: 'python',
