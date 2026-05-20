@@ -96,16 +96,11 @@ function showEditView() {
 function highlightLine(stepIndex) {
   var allLines = codeDisplay.querySelectorAll('.line');
   for (var i = 0; i < allLines.length; i++) {
-    allLines[i].classList.remove('active', 'current');
+    allLines[i].classList.remove('current');
   }
   if (stepIndex >= 0 && stepIndex < allLines.length) {
     allLines[stepIndex].classList.add('current');
-    // 滚动到可见区域
     allLines[stepIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }
-  // 已执行的行加 active 样式
-  for (var i = 0; i < stepIndex; i++) {
-    if (i < allLines.length) allLines[i].classList.add('active');
   }
 }
 
