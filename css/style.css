@@ -26,30 +26,30 @@ body {
 
 /* 工具栏 */
 .toolbar {
-  display: flex; align-items: center; gap: 14px; padding: 12px 20px;
+  display: flex; align-items: center; gap: 10px; padding: 8px 16px;
   background: var(--surface); border-bottom: 1px solid var(--overlay);
 }
 
 .toolbar button {
   background: var(--overlay); color: var(--text);
-  border: 1px solid var(--overlay); padding: 8px 22px;
-  border-radius: 5px; cursor: pointer; font-size: 15px;
+  border: 1px solid var(--overlay); padding: 6px 16px;
+  border-radius: 4px; cursor: pointer; font-size: 13px;
 }
 
 .toolbar button:hover { background: var(--purple); color: var(--bg); }
 
 .toolbar-hint {
   margin-left: auto;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--subtext);
   font-family: monospace;
 }
 
 /* 场景描述条 */
 #desc-bar {
-  padding: 10px 20px; font-size: 15px; color: var(--yellow);
+  padding: 6px 16px; font-size: 13px; color: var(--yellow);
   background: var(--surface); border-bottom: 1px solid var(--overlay);
-  min-height: 38px; line-height: 1.5;
+  min-height: 30px; line-height: 1.5;
 }
 
 /* 三区布局 */
@@ -58,21 +58,21 @@ body {
 }
 
 #preset-panel {
-  width: 210px; background: var(--surface);
-  border-right: 1px solid var(--overlay); padding: 16px;
+  width: 180px; background: var(--surface);
+  border-right: 1px solid var(--overlay); padding: 12px;
   overflow-y: auto;
 }
 
 #preset-panel h3 {
-  color: var(--yellow); font-size: 14px;
-  margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--yellow); font-size: 13px;
+  margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;
 }
 
 #preset-list { list-style: none; }
 
 #preset-list li {
-  padding: 10px 12px; border-radius: 5px; cursor: pointer;
-  font-size: 14px; margin-bottom: 3px; color: var(--subtext);
+  padding: 8px 10px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; margin-bottom: 2px; color: var(--subtext);
   transition: background 0.15s, color 0.15s;
 }
 
@@ -86,17 +86,17 @@ body {
 
 #code-editor {
   flex: 1; background: var(--bg); color: var(--green);
-  border: none; padding: 20px; font-family: 'Cascadia Code', 'Fira Code', monospace;
-  font-size: 16px; line-height: 1.8; resize: none; outline: none;
+  border: none; padding: 16px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 14px; line-height: 1.7; resize: none; outline: none;
   tab-size: 2;
 }
 #code-editor.hidden { display: none; }
 
 #code-display {
   flex: 1; background: var(--bg);
-  border: none; padding: 20px; margin: 0;
+  border: none; padding: 16px; margin: 0;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
-  font-size: 16px; line-height: 1.8; overflow: auto;
+  font-size: 14px; line-height: 1.7; overflow: auto;
   color: var(--subtext); white-space: pre-wrap;
   display: none;
   counter-reset: line;
@@ -104,13 +104,13 @@ body {
 #code-display.visible { display: block; }
 
 #code-display .line {
-  display: block; padding: 0 10px; border-radius: 3px;
+  display: block; padding: 0 8px; border-radius: 3px;
   counter-increment: line;
 }
 #code-display .line::before {
   content: counter(line);
-  display: inline-block; width: 28px; margin-right: 18px;
-  color: var(--overlay); text-align: right; font-size: 13px;
+  display: inline-block; width: 24px; margin-right: 16px;
+  color: var(--overlay); text-align: right; font-size: 12px;
   user-select: none;
 }
 #code-display .line.active {
@@ -135,38 +135,38 @@ body {
 }
 
 #step-controls {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  padding: 14px 20px; background: var(--surface);
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 10px 16px; background: var(--surface);
   border-top: 1px solid var(--overlay);
 }
 
 #step-controls button {
   background: var(--overlay); color: var(--text);
-  border: none; padding: 8px 20px; border-radius: 5px;
-  cursor: pointer; font-size: 15px;
+  border: none; padding: 6px 16px; border-radius: 4px;
+  cursor: pointer; font-size: 13px;
 }
 
 #step-controls button:hover:not(:disabled) { background: var(--purple); }
 #step-controls button:disabled { opacity: 0.4; cursor: default; }
 
 #step-indicator {
-  font-size: 15px; color: var(--yellow); min-width: 100px; text-align: center;
+  font-size: 13px; color: var(--yellow); min-width: 80px; text-align: center;
 }
 
-#step-slider { flex: 1; accent-color: var(--purple); height: 6px; cursor: pointer; }
+#step-slider { flex: 1; accent-color: var(--purple); height: 4px; cursor: pointer; }
 
 #step-slider::-webkit-slider-thumb {
-  width: 18px; height: 18px;
+  width: 16px; height: 16px;
   background: var(--purple); border-radius: 50%;
   cursor: pointer;
 }
 
 /* 错误提示 */
 .error-toast {
-  position: fixed; top: 56px; right: 24px;
+  position: fixed; top: 48px; right: 20px;
   background: var(--red); color: white;
-  padding: 12px 24px; border-radius: 6px;
-  font-size: 15px; z-index: 100;
+  padding: 10px 20px; border-radius: 6px;
+  font-size: 13px; z-index: 100;
   animation: fadeOut 3s forwards;
 }
 
@@ -177,7 +177,7 @@ body {
 }
 
 /* 滚动条 */
-#preset-panel::-webkit-scrollbar { width: 5px; }
-#preset-panel::-webkit-scrollbar-thumb { background: var(--overlay); border-radius: 3px; }
-#code-editor::-webkit-scrollbar { width: 7px; }
+#preset-panel::-webkit-scrollbar { width: 4px; }
+#preset-panel::-webkit-scrollbar-thumb { background: var(--overlay); border-radius: 2px; }
+#code-editor::-webkit-scrollbar { width: 6px; }
 #code-editor::-webkit-scrollbar-thumb { background: var(--overlay); border-radius: 3px; }
